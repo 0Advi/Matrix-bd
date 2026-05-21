@@ -1,0 +1,102 @@
+"""Pydantic schemas for site resources."""
+from __future__ import annotations
+from datetime import date
+from typing import Optional
+from pydantic import BaseModel
+from app.domain.state_machine import SiteStatus
+
+
+# ── Request models ─────────────────────────────────────────────────────────────
+
+class CreateDraftRequest(BaseModel):
+    name: str
+    city: str
+    visit_date: date
+
+
+class ShortlistDraftRequest(BaseModel):
+    site_id: str
+
+
+class RejectSiteRequest(BaseModel):
+    reasons: list[str]
+    note: Optional[str] = None
+
+
+class SaveDetailsRequest(BaseModel):
+    """Partial 17-field form save — all fields optional so exec can save incrementally."""
+    model: Optional[str] = None
+    spoc_name: Optional[str] = None
+    google_pin: Optional[str] = None
+    score: Optional[float] = None
+    est_sales: Optional[float] = None
+    nearest_starbucks: Optional[float] = None
+    nearest_twc: Optional[float] = None
+    carpet: Optional[float] = None
+    cam: Optional[float] = None
+    rent_type: Optional[str] = None
+    rent: Optional[float] = None
+    escalation: Optional[float] = None
+    rent_free_days: Optional[int] = None
+    cadex: Optional[float] = None
+    deposit: Optional[float] = None
+    brokerage: Optional[float] = None
+    lockin: Optional[int] = None
+    tenure: Optional[int] = None
+    total_op_cost: Optional[float] = None
+
+
+class SubmitDetailsRequest(SaveDetailsRequest):
+    """Submit for review — same fields but all required fields must be present."""
+    pass
+
+
+class ApproveShortlistRequest(BaseModel):
+    expected_loi_days: int
+
+
+class ReassignSiteRequest(BaseModel):
+    new_owner_id: str
+
+
+class AssignSubSupervisorRequest(BaseModel):
+    user_id: str
+    city: str
+
+
+class ArchiveSiteRequest(BaseModel):
+    note: str | None = None
+
+
+class PatchSiteStatusRequest(BaseModel):
+    status: SiteStatus
+    payload: dict | None = None
+
+
+class PatchSiteDetailsRequest(BaseModel):
+    details: SaveDetailsRequest
+
+
+class AssignSiteRequest(BaseModel):
+    exec_id: str
+
+
+# ── Response models ─────────────────────────────────────────────────────────────
+
+class SiteResponse(BaseModel):
+    id: str
+    code: str
+    name: str
+    city: str
+    tenant_id: str
+    status: SiteStatus
+    created_by: str
+    visit_date: Optional[date] = None
+    days: Optional[int] = None
+    stage: Optional[str] = None
+    details_completion: Optional[str] = None
+
+
+class SiteListResponse(BaseModel):
+    items: list[SiteResponse]
+    total: int
