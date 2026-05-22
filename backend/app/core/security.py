@@ -1,8 +1,9 @@
-"""Supabase JWT verification.
+"""JWT verification + issuance.
 
-Supabase issues HS256-signed JWTs by default. The "JWT secret" lives in
-*Project Settings → API* and is shared between the GoTrue auth service and
-your backend; verify with it directly.
+We sign and verify HS256 JWTs with the Supabase JWT secret. The same secret
+is used by Supabase Auth (if/when we wire it back in), so tokens minted
+here are forward-compatible. Today the backend mints its own tokens at
+sign-in time (POST /api/auth/login) — no Supabase Auth round-trip needed.
 
 Claims of interest:
     sub:               the Supabase user id (UUID) — maps to users.id
@@ -21,12 +22,51 @@ Notes:
 """
 from __future__ import annotations
 
-from typing import Any
+import datetime as dt
+from typing import Any, Optional
 
 import jwt
 from fastapi import HTTPException, status
 
 from app.core.config import settings
+
+
+# How long an issued access token stays valid. 24h is a reasonable default for
+# an internal ops tool — strikes a balance between UX (no re-login every hour)
+# and blast radius (lost laptops eventually lock themselves out).
+TOKEN_TTL_SECONDS = 60 * 60 * 24  # 24 hours
+
+
+def issue_token(
+    *,
+    sub: str,
+    email: str,
+    name: str,
+    role: str,
+    tenant_id: str,
+    city: Optional[str] = None,
+    ttl_seconds: int = TOKEN_TTL_SECONDS,
+) -> str:
+    """Mint an HS256 JWT with the claim shape `decode_token` expects.
+
+    Mirrors Supabase's app_metadata structure exactly so the decode path
+    doesn't care whether the token came from us or from Supabase Auth.
+    """
+    now = dt.datetime.now(tz=dt.timezone.utc)
+    claims = {
+        "sub":   sub,
+        "aud":   settings.supabase_jwt_audience,
+        "iat":   int(now.timestamp()),
+        "exp":   int((now + dt.timedelta(seconds=ttl_seconds)).timestamp()),
+        "email": email,
+        "app_metadata": {
+            "role":      role,
+            "tenant_id": tenant_id,
+            "city":      city,
+        },
+        "user_metadata": {"full_name": name},
+    }
+    return jwt.encode(claims, settings.supabase_jwt_secret, algorithm="HS256")
 
 
 class AuthError(HTTPException):

@@ -23,19 +23,33 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 
 
 def _make_engine() -> AsyncEngine:
-    return create_async_engine(
-        settings.database_url,
-        pool_size=settings.db_pool_size,
-        max_overflow=settings.db_max_overflow,
-        pool_pre_ping=True,
-        pool_recycle=settings.db_pool_recycle_seconds,
-        echo=settings.debug,
-    )
+    # Supabase's transaction pooler is pgBouncer in transaction mode, which
+    # does NOT support prepared statements. The documented fix when going
+    # through pgBouncer is:
+    #   1. Disable asyncpg's statement cache (statement_cache_size=0)
+    #   2. Use SQLAlchemy NullPool so we don't reuse connections across
+    #      transactions (pgBouncer assigns a different backend per txn anyway,
+    #      and SQLAlchemy's own pool would hand out connections that
+    #      already-cached statements at the asyncpg layer).
+    is_pooler = ":6543/" in settings.database_url or "pooler.supabase.com" in settings.database_url
+    kwargs: dict = {
+        "echo": settings.debug,
+    }
+    if is_pooler:
+        kwargs["poolclass"]   = NullPool
+        kwargs["connect_args"] = {"statement_cache_size": 0}
+    else:
+        kwargs["pool_size"]       = settings.db_pool_size
+        kwargs["max_overflow"]    = settings.db_max_overflow
+        kwargs["pool_pre_ping"]   = True
+        kwargs["pool_recycle"]    = settings.db_pool_recycle_seconds
+    return create_async_engine(settings.database_url, **kwargs)
 
 
 engine: AsyncEngine = _make_engine()

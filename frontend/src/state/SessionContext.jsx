@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { DEFAULT_SESSION } from '../services/api/authService.js';
+import { DEFAULT_SESSION, me as fetchMe, logout as logoutApi } from '../services/api/authService.js';
 import { can, PERMISSIONS } from '../rbac/permissions.js';
 import { ROLE } from '../rbac/roles.js';
+import { subscribeAuthToken, getAuthToken, clearAuthToken } from '../services/api/authToken.js';
+import { signOut as supabaseSignOut } from '../services/api/supabaseAuth.js';
 
 // SessionContext — holds the current user session and role.
 // In MOCK mode the session comes from DEFAULT_SESSION (legacy: Riya Sharma as supervisor).
@@ -37,7 +39,47 @@ export function SessionProvider({ children }) {
     document.body.dataset.theme = dark ? 'dark' : 'light';
   }, [dark]);
 
+  // In HTTP mode, hydrate session from /auth/whoami whenever a token appears
+  // (sign-in or token refresh) and reset to defaults when it clears.
+  useEffect(() => {
+    if (USE_MOCK) return;
+    let alive = true;
+    const hydrate = async (token) => {
+      if (!token) {
+        if (alive) setSession(INITIAL_SESSION);
+        return;
+      }
+      try {
+        const claims = await fetchMe(); // GET /auth/whoami
+        if (!alive) return;
+        setSession({
+          ...INITIAL_SESSION,
+          name:      claims.email ? claims.email.split('@')[0] : INITIAL_SESSION.name,
+          email:     claims.email || INITIAL_SESSION.email,
+          role:      claims.role || INITIAL_SESSION.role,
+          tenantId:  claims.tenant_id || INITIAL_SESSION.tenantId,
+          cityScope: claims.city || INITIAL_SESSION.cityScope,
+        });
+      } catch (err) {
+        // 401/403 → token is stale or app_metadata missing. Clear so the UI
+        // bounces back to the landing page.
+        // eslint-disable-next-line no-console
+        console.warn('[session] /auth/whoami failed — clearing token', err);
+        clearAuthToken();
+      }
+    };
+    hydrate(getAuthToken());
+    return subscribeAuthToken(hydrate);
+  }, []);
+
   const toggleDark = () => setDark(d => !d);
+
+  const signOut = async () => {
+    try { await logoutApi(); } catch { /* best-effort */ }
+    try { await supabaseSignOut(); } catch { /* best-effort */ }
+    clearAuthToken();
+    setSession(INITIAL_SESSION);
+  };
 
   // Derive permissions from role using the RBAC engine.
   const permissions = useMemo(() => {
@@ -70,6 +112,7 @@ export function SessionProvider({ children }) {
     toggleDark,
     can: (action) => can(role, action),
     isMockMode: USE_MOCK,
+    signOut,
   };
 
   return (

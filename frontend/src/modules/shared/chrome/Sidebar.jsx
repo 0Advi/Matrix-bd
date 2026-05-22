@@ -57,6 +57,7 @@ export default function Sidebar({ counts, role, onRole }) {
     path === ROUTES.SHORTLIST || path.startsWith('/shortlist/') ? 'shortlist' :
     path.startsWith('/staging')                          ? 'staging'   :
     path === ROUTES.ARCHIVE                              ? 'archive'   :
+    path === ROUTES.TEAM                                 ? 'team'      :
     'overview';
 
   const go = (route) => navigate(route);
@@ -85,6 +86,23 @@ export default function Sidebar({ counts, role, onRole }) {
       <SidebarItem icon="box"    label="Staging"         count={counts.staging}   active={activeView === 'staging'}   onClick={() => go(ROUTES.STAGING)}/>
       {(role === 'supervisor' || role === 'sub_supervisor') && (
         <SidebarItem icon="folder" label="Archive" count={counts.archive} active={activeView === 'archive'} onClick={() => go(ROUTES.ARCHIVE)}/>
+      )}
+
+      {role === 'supervisor' && (
+        <>
+          <div style={{
+            fontFamily: 'var(--zm-font-body)', fontWeight: 600, fontSize: 10,
+            letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--zm-fg-4)',
+            padding: '14px 10px 6px',
+          }}>Workspace</div>
+          <SidebarItem
+            icon="user"
+            label="Team"
+            count={counts.pendingUsers}
+            active={activeView === 'team'}
+            onClick={() => go(ROUTES.TEAM)}
+          />
+        </>
       )}
 
       <div style={{ flex: 1 }}/>

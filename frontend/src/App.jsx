@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useSession } from './state/SessionContext.jsx';
 import { useSites } from './state/SitesContext.jsx';
+import { listPendingUsers } from './services/api/adapters/httpAdapter.js';
 import TopBar from './modules/shared/chrome/TopBar.jsx';
 import Sidebar from './modules/shared/chrome/Sidebar.jsx';
 import SiteDrawer from './modules/shared/site-drawer/SiteDrawer.jsx';
@@ -63,11 +64,28 @@ export default function App() {
     ? filterByScope(staging, role, user)
     : staging.filter(s => s.loiUploaded === true);
 
+  // Pending-user count for the "Team" sidebar badge. Only fetched for
+  // supervisors — the endpoint is supervisor-gated and would 403 for anyone
+  // else, polluting the console.
+  const [pendingUserCount, setPendingUserCount] = useState(0);
+  useEffect(() => {
+    if (role !== 'supervisor') { setPendingUserCount(0); return; }
+    let alive = true;
+    const refresh = () => listPendingUsers()
+      .then(arr => alive && setPendingUserCount(arr.length))
+      .catch(() => { /* ignore — empty badge is fine */ });
+    refresh();
+    // Cheap poll so a supervisor reviewing the queue sees joiners show up.
+    const t = window.setInterval(refresh, 30_000);
+    return () => { alive = false; clearInterval(t); };
+  }, [role]);
+
   const counts = {
-    pipeline:  visibleDrafts.length,
-    shortlist: visibleShortlist.length,
-    staging:   visibleStaging.length,
-    archive:   archive.length,
+    pipeline:     visibleDrafts.length,
+    shortlist:    visibleShortlist.length,
+    staging:      visibleStaging.length,
+    archive:      archive.length,
+    pendingUsers: pendingUserCount || undefined, // hide the badge at 0
   };
 
   const ME = user.name;

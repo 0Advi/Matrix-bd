@@ -192,3 +192,40 @@ export async function logout() { return post('/auth/logout'); }
 // `login` is intentionally NOT exported. With Supabase the sign-in happens on
 // the client via the Supabase JS SDK; the resulting token is fed to
 // authToken.setAuthToken(token). See frontend/src/services/api/supabaseAuth.js.
+
+// ── Tenancy / team management ──────────────────────────────────────────────
+
+export async function getWorkspaceInfo() {
+  const d = await get('/tenancy/workspace-info');
+  return {
+    id:             d.id,
+    name:           d.name,
+    slug:           d.slug,
+    plan:           d.plan,
+    workspaceCode:  d.workspace_code,
+    seatLimit:      d.seat_limit,
+    usedSeats:      d.used_seats,
+    pendingSeats:   d.pending_seats,
+  };
+}
+
+export async function listPendingUsers() {
+  const d = await get('/users/pending');
+  return (d?.items || []).map(u => ({
+    id:        u.id,
+    email:     u.email,
+    name:      u.name,
+    role:      u.role,
+    createdAt: u.created_at,
+  }));
+}
+
+export async function assignUserRole(userId, { role, city, name }) {
+  const d = await post(`/users/${userId}/assign-role`, { role, city, name });
+  return {
+    userId:  d.user_id,
+    role:    d.role,
+    city:    d.city,
+    message: d.message,
+  };
+}

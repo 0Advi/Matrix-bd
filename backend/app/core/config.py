@@ -51,5 +51,12 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""
     supabase_storage_bucket: str = "site-files"
 
+    # ── Platform admin (workspace-request approval) ─────────────────────────
+    # Shared secret for the X-Platform-Admin-Key header on
+    # POST /api/tenancy/requests/{id}/approve. Generate with
+    # `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+    # Leave empty in production to disable the approve endpoint entirely.
+    platform_admin_token: str = ""
+
 
 settings = Settings()
