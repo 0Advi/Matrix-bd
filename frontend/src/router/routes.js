@@ -7,6 +7,7 @@ export const ROUTES = {
   STAGING_SUPERVISOR:   '/staging/supervisor',
   STAGING:              '/staging',
   ARCHIVE:              '/archive',
+  TEAM:                 '/team',
   SITE:                 '/sites/:id',
   ADD_DETAILS:          '/shortlist/:code/details',
   LOI_TIMELINE:         '/shortlist/:code/timeline',

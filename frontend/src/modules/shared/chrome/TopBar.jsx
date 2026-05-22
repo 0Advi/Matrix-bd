@@ -1,9 +1,31 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Icon from '../primitives/Icon.jsx';
 import Avatar from '../primitives/Avatar.jsx';
+import { useSession } from '../../../state/SessionContext.jsx';
 
 // Render body preserved exactly from Chrome.jsx TopBar component.
 export default function TopBar({ user, role, dark, onToggleDark, onNewPipeline, onSearch }) {
+  const { signOut } = useSession();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  // Click-outside to close the account menu.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDocClick = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [menuOpen]);
+
+  const handleSignOut = async () => {
+    setMenuOpen(false);
+    if (signOut) await signOut();
+    // SessionContext clears the token, which RequireAuth picks up and routes
+    // back to /welcome automatically — no explicit navigate needed.
+  };
+
   return (
     <header style={{
       height: 64, padding: 0,
@@ -112,34 +134,88 @@ export default function TopBar({ user, role, dark, onToggleDark, onNewPipeline, 
 
         <span style={{ width: 1, height: 24, background: 'var(--zm-line)', marginLeft: 2, flex: '0 0 auto' }}/>
 
-        <button title="Account" style={{
-          display: 'inline-flex', alignItems: 'center', gap: 10,
-          height: 40, padding: '0 10px 0 4px', borderRadius: 999,
-          background: 'transparent', border: '1px solid transparent',
-          cursor: 'pointer', flex: '0 0 auto',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--zm-surface-hover)'; e.currentTarget.style.borderColor = 'var(--zm-line)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; }}
-        >
-          <Avatar name={user.name} size={30}/>
-          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, whiteSpace: 'nowrap', alignItems: 'flex-start' }}>
-            <span style={{ fontFamily: 'var(--zm-font-body)', fontSize: 12.5, fontWeight: 600, color: 'var(--zm-fg)' }}>{user.name}</span>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontFamily: 'var(--zm-font-body)', fontSize: 10.5, fontWeight: 600,
-              letterSpacing: '0.08em', textTransform: 'uppercase',
-              color: role === 'supervisor' ? 'var(--zm-accent)' : 'var(--zm-fg-3)',
-              marginTop: 2,
-            }}>
+        <div ref={menuRef} style={{ position: 'relative' }}>
+          <button
+            type="button"
+            title="Account"
+            onClick={() => setMenuOpen((v) => !v)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 10,
+              height: 40, padding: '0 10px 0 4px', borderRadius: 999,
+              background: menuOpen ? 'var(--zm-surface-hover)' : 'transparent',
+              border: '1px solid ' + (menuOpen ? 'var(--zm-line)' : 'transparent'),
+              cursor: 'pointer', flex: '0 0 auto',
+            }}
+            onMouseEnter={(e) => { if (!menuOpen) { e.currentTarget.style.background = 'var(--zm-surface-hover)'; e.currentTarget.style.borderColor = 'var(--zm-line)'; } }}
+            onMouseLeave={(e) => { if (!menuOpen) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; } }}
+          >
+            <Avatar name={user.name} size={30}/>
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, whiteSpace: 'nowrap', alignItems: 'flex-start' }}>
+              <span style={{ fontFamily: 'var(--zm-font-body)', fontSize: 12.5, fontWeight: 600, color: 'var(--zm-fg)' }}>{user.name}</span>
               <span style={{
-                width: 5, height: 5, borderRadius: 999,
-                background: role === 'supervisor' ? 'var(--zm-accent)' : 'var(--zm-fg-3)',
-              }}/>
-              {role === 'supervisor' ? 'Supervisor' : 'BD Exec'}
-            </span>
-          </div>
-          <Icon name="chevronDown" size={12} style={{ color: 'var(--zm-fg-3)' }}/>
-        </button>
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontFamily: 'var(--zm-font-body)', fontSize: 10.5, fontWeight: 600,
+                letterSpacing: '0.08em', textTransform: 'uppercase',
+                color: role === 'supervisor' ? 'var(--zm-accent)' : 'var(--zm-fg-3)',
+                marginTop: 2,
+              }}>
+                <span style={{
+                  width: 5, height: 5, borderRadius: 999,
+                  background: role === 'supervisor' ? 'var(--zm-accent)' : 'var(--zm-fg-3)',
+                }}/>
+                {role === 'supervisor' ? 'Supervisor' :
+                 role === 'sub_supervisor' ? 'City lead' :
+                 role === 'exec' || role === 'executive' ? 'Executive' :
+                 role === 'bd_person' ? 'BD exec' :
+                 (role || 'BD Exec')}
+              </span>
+            </div>
+            <Icon name="chevronDown" size={12} style={{ color: 'var(--zm-fg-3)' }}/>
+          </button>
+
+          {menuOpen && (
+            <div
+              role="menu"
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                right: 0,
+                minWidth: 220,
+                padding: 6,
+                borderRadius: 12,
+                border: '1px solid var(--zm-line)',
+                background: 'var(--zm-surface)',
+                boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
+                zIndex: 50,
+              }}
+            >
+              <div style={{
+                padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 2,
+                borderBottom: '1px solid var(--zm-line)', marginBottom: 4,
+              }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--zm-fg)' }}>{user.name}</span>
+                <span style={{ fontSize: 11, color: 'var(--zm-fg-3)' }}>{user.email}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                style={{
+                  width: '100%', textAlign: 'left',
+                  padding: '8px 10px', borderRadius: 8,
+                  border: 'none', background: 'transparent',
+                  color: 'var(--zm-fg)', fontSize: 13, fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--zm-surface-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <Icon name="arrow" size={14} style={{ color: 'var(--zm-fg-3)', transform: 'rotate(180deg)' }}/>
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

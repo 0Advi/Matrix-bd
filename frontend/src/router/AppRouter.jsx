@@ -3,8 +3,10 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { ROUTES } from './routes.js';
 import { RequireRole } from './guards.jsx';
 import { useSession } from '../state/SessionContext.jsx';
+import { useAuthToken } from '../state/useAuthToken.js';
 
 import App from '../App.jsx';
+import LandingPage          from '../modules/landing/LandingPage.jsx';
 import OverviewPage          from '../modules/bd/overview/OverviewPage.jsx';
 import DraftsPage            from '../modules/bd/drafts/DraftsPage.jsx';
 import ShortlistPage         from '../modules/bd/shortlist/ShortlistPage.jsx';
@@ -12,14 +14,33 @@ import ExecStagingPage       from '../modules/staging/exec/ExecStagingPage.jsx';
 import SupervisorStagingPage from '../modules/staging/supervisor/SupervisorStagingPage.jsx';
 import ArchivePage           from '../modules/archive/ArchivePage.jsx';
 import AddDetailsPage        from '../modules/loi/details/AddDetailsPage.jsx';
+import TeamPage              from '../modules/team/TeamPage.jsx';
 
-// App is used as a layout shell (renders TopBar + Sidebar + <Outlet/>).
-// Page components are nested routes rendered into the Outlet.
+// In HTTP (non-mock) mode the landing page is the unauthenticated entry. The
+// existing app chrome only renders after a Supabase session is established.
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true' || import.meta.env.VITE_USE_MOCK === true;
+const LANDING_PATH = '/welcome';
+
+function RequireAuth({ children }) {
+  const token = useAuthToken();
+  if (USE_MOCK) return children; // mock mode is always "signed in"
+  if (!token)   return <Navigate to={LANDING_PATH} replace/>;
+  return children;
+}
+
+function LandingRedirectIfAuthed() {
+  // Send signed-in users away from the marketing page back to the dashboard.
+  const token = useAuthToken();
+  if (!USE_MOCK && token) return <Navigate to={ROUTES.OVERVIEW} replace/>;
+  return <LandingPage/>;
+}
 
 export default function AppRouter() {
   return (
     <Routes>
-      <Route element={<App/>}>
+      <Route path={LANDING_PATH} element={<LandingRedirectIfAuthed/>}/>
+
+      <Route element={<RequireAuth><App/></RequireAuth>}>
         <Route index                  element={<OverviewPage/>}/>
         <Route path={ROUTES.PIPELINE}  element={<DraftsPage/>}/>
         <Route path={ROUTES.SHORTLIST} element={<ShortlistPage/>}/>
@@ -40,6 +61,12 @@ export default function AppRouter() {
         <Route path={ROUTES.ARCHIVE} element={
           <RequireRole roles={['supervisor', 'sub_supervisor']}>
             <ArchivePage/>
+          </RequireRole>
+        }/>
+
+        <Route path={ROUTES.TEAM} element={
+          <RequireRole roles={['supervisor']}>
+            <TeamPage/>
           </RequireRole>
         }/>
 
