@@ -35,6 +35,7 @@ from app.services._common import (
     site_to_response,
 )
 from app.services.audit_service import diff_and_log_pipeline_fields, write_audit_event
+from app.services.delegation_service import actor_has_delegation_for_site
 from app.services.notification_service import (
     enqueue as notify_enqueue,
     recipients_for_site_owner,
@@ -61,10 +62,20 @@ def _city_eq(a: str | None, b: str | None) -> bool:
     return (a or "").strip().lower() == (b or "").strip().lower()
 
 
-def _assert_actor_can_act_on_site(actor: dict, site: models.Site) -> None:
+async def _assert_actor_can_act_on_site(
+    session: AsyncSession, actor: dict, site: models.Site,
+) -> None:
     """City-scope guard. Raises 403 if sub_supervisor is acting outside their
-    assigned city. Supervisor / executive pass through untouched."""
+    assigned city. Supervisor / executive pass through untouched.
+
+    Delegation override: if the sub-supervisor holds an active delegation for
+    this specific site, the city check is bypassed — that's the whole point of
+    the delegation feature (let a deputy own a single cross-city site)."""
     if (actor.get("role") or "").lower() != "sub_supervisor":
+        return
+    if await actor_has_delegation_for_site(
+        session, tenant_id=site.tenant_id, site_id=site.id, user_id=actor["sub"],
+    ):
         return
     actor_city = actor.get("city")
     if not actor_city:
@@ -77,7 +88,8 @@ def _assert_actor_can_act_on_site(actor: dict, site: models.Site) -> None:
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail=(
                 f"You can only act on sites in your assigned city "
-                f"({actor_city}). This site is in {site.city}."
+                f"({actor_city}). This site is in {site.city}. Ask the "
+                f"supervisor to delegate this site to you."
             ),
         )
 
@@ -181,7 +193,7 @@ async def svc_shortlist_draft(
 ) -> SiteResponse:
     async with transaction(session):
         site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
-        _assert_actor_can_act_on_site(actor, site)
+        await _assert_actor_can_act_on_site(session, actor, site)
         _assert_not_self_approval(actor, site)
         assert_transition(SiteStatus(site.status), SiteStatus.SHORTLISTED)
         site.status = SiteStatus.SHORTLISTED.value
@@ -337,7 +349,7 @@ async def svc_approve_shortlist(
 ) -> SiteResponse:
     async with transaction(session):
         site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
-        _assert_actor_can_act_on_site(actor, site)
+        await _assert_actor_can_act_on_site(session, actor, site)
         _assert_not_self_approval(actor, site)
         assert_transition(SiteStatus(site.status), SiteStatus.APPROVED)
         approved_at = datetime.now(timezone.utc)
@@ -389,7 +401,7 @@ async def svc_push_to_payments(
 ) -> OkResponse:
     async with transaction(session):
         site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
-        _assert_actor_can_act_on_site(actor, site)
+        await _assert_actor_can_act_on_site(session, actor, site)
         assert_transition(SiteStatus(site.status), SiteStatus.PUSHED_TO_PAYMENTS)
         site.status = SiteStatus.PUSHED_TO_PAYMENTS.value
         site.pushed_to_payments_at = datetime.now(timezone.utc)
@@ -418,7 +430,7 @@ async def svc_reject_site(
 ) -> OkResponse:
     async with transaction(session):
         site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
-        _assert_actor_can_act_on_site(actor, site)
+        await _assert_actor_can_act_on_site(session, actor, site)
         _assert_not_self_approval(actor, site)
         assert_transition(SiteStatus(site.status), SiteStatus.REJECTED)
         site.status = SiteStatus.REJECTED.value
@@ -449,7 +461,7 @@ async def svc_archive_site(
 ) -> OkResponse:
     async with transaction(session):
         site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
-        _assert_actor_can_act_on_site(actor, site)
+        await _assert_actor_can_act_on_site(session, actor, site)
         # Archive note is mandatory — see Todo #9. Per the product spec every
         # archived site must carry a reason so the Archive tab is browsable.
         clean_note = (note or "").strip()

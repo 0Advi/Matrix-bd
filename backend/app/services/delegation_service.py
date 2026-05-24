@@ -73,6 +73,13 @@ async def svc_grant_delegation(
                 status_code=http_status.HTTP_404_NOT_FOUND,
                 detail="Delegate user not found in this workspace, or not active.",
             )
+        # Only sub-supervisors are eligible delegates. Executives don't approve
+        # shortlists at all; other supervisors already have full power.
+        if (delegate.role or "").lower() != "sub_supervisor":
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="Delegations can only be granted to sub_supervisor users.",
+            )
 
         # If an active delegation for the same (site, delegate) already
         # exists, refuse rather than silently double-granting.
