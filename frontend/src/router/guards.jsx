@@ -4,10 +4,15 @@ import { useSession } from '../state/SessionContext.jsx';
 import { ROUTES } from './routes.js';
 
 // RequireRole: redirects to overview if the current role is not in the allowed list.
-// `roles` can contain canonical ROLE values or legacy display values ('exec', 'supervisor').
+// `roles` can contain canonical ROLE values or legacy display values.
+// Treats 'exec' and 'executive' as the same role so HTTP-mode JWTs (which
+// always emit 'executive') match guards that still list the legacy 'exec' alias.
 export function RequireRole({ roles, children }) {
   const { role } = useSession();
-  if (!roles.includes(role)) {
+  const allowed = new Set(roles);
+  if (allowed.has('exec'))      allowed.add('executive');
+  if (allowed.has('executive')) allowed.add('exec');
+  if (!allowed.has(role)) {
     return <Navigate to={ROUTES.OVERVIEW} replace />;
   }
   return children;

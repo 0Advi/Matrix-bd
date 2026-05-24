@@ -88,5 +88,7 @@ export default function AppRouter() {
 
 function StagingRedirect() {
   const { role } = useSession();
-  return <Navigate to={role === 'exec' ? ROUTES.STAGING_EXEC : ROUTES.STAGING_SUPERVISOR} replace/>;
+  // Backend ships role='executive'; mock-mode role switcher still uses 'exec'.
+  const isExec = role === 'exec' || role === 'executive';
+  return <Navigate to={isExec ? ROUTES.STAGING_EXEC : ROUTES.STAGING_SUPERVISOR} replace/>;
 }
