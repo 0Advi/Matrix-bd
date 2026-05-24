@@ -60,7 +60,10 @@ export default function App() {
   // Scope-filtered counts using RBAC filterByScope
   const visibleDrafts    = filterByScope(drafts,    role, user);
   const visibleShortlist = filterByScope(shortlist, role, user);
-  const visibleStaging   = role === 'exec'
+  // HTTP mode emits role='executive'; mock mode kept the legacy 'exec' alias.
+  // Match both so role-based filters don't silently drop the executive view.
+  const isExec = role === 'exec' || role === 'executive';
+  const visibleStaging   = isExec
     ? filterByScope(staging, role, user)
     : staging.filter(s => s.loiUploaded === true);
 

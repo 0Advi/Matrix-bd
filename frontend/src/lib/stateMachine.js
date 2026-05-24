@@ -1,15 +1,16 @@
-// Client-side mirror of backend app/domain/state_machine.py
-// Keep in sync with the backend enum and transition table.
-
+// Client-side mirror of backend app/domain/state_machine.py.
+// Values MUST match the lowercase strings the backend persists in
+// `sites.status` and emits in JSON responses. Mismatched casing here will
+// silently hide every site in the UI because SitesContext compares with ===.
 export const SiteStatus = {
-  DRAFT_SUBMITTED:    'DRAFT_SUBMITTED',
-  SHORTLISTED:        'SHORTLISTED',
-  DETAILS_SUBMITTED:  'DETAILS_SUBMITTED',
-  APPROVED:           'APPROVED',
-  LOI_UPLOADED:       'LOI_UPLOADED',
-  PUSHED_TO_PAYMENTS: 'PUSHED_TO_PAYMENTS',
-  REJECTED:           'REJECTED',
-  ARCHIVED:           'ARCHIVED',
+  DRAFT_SUBMITTED:    'draft_submitted',
+  SHORTLISTED:        'shortlisted',
+  DETAILS_SUBMITTED:  'details_submitted',
+  APPROVED:           'approved',
+  LOI_UPLOADED:       'loi_uploaded',
+  PUSHED_TO_PAYMENTS: 'pushed_to_payments',
+  REJECTED:           'rejected',
+  ARCHIVED:           'archived',
 };
 
 // Allowed transitions: { fromStatus: [toStatus, ...] }
