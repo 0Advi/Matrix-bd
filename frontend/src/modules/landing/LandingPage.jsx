@@ -14,7 +14,11 @@ function decodeJwtPayload(token) {
   try {
     const payload = token.split('.')[1];
     if (!payload) return null;
-    return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    const raw = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    // Backend stashes role/tenant_id under app_metadata (Supabase claim shape).
+    // Flatten so callers can read `.role` directly.
+    const md = raw?.app_metadata || {};
+    return { ...raw, ...md };
   } catch {
     return null;
   }
