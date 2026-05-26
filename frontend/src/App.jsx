@@ -168,14 +168,14 @@ const PIPELINE_RENT_TYPES = [
   { id: 'mg_revshare', label: 'MG + Revenue share', sub: 'minimum guarantee + % of sales' },
 ];
 function NewPipelineModal({ onClose, onSubmit }) {
-  const [form, setForm] = useState({ name: '', visitDate: '', city: '', model: '', spocName: '', googlePin: '', googleMapsUrl: '', rentType: '', expectedRent: '', expectedEscalation: '', expectedRevshare: '' });
+  const [form, setForm] = useState({ name: '', visitDate: '', city: '', model: '', spocName: '', googlePin: '', googleMapsUrl: '', rentType: '', expectedRent: '', expectedEscalation: '', expectedEscalationYears: '', expectedRevshare: '' });
   const [pinStatus, setPinStatus] = useState(null); // { tone: 'info'|'ok'|'err', msg: string }
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   // Rent-type-specific essentials. Mirrors AddDetailsPage so the data captured
   // upfront matches what the shortlist form expects to prefill from.
   const rentReady =
     form.rentType === 'revshare' ? !!form.expectedRevshare
-    : form.rentType === 'fixed' ? !!form.expectedRent && !!form.expectedEscalation
+    : form.rentType === 'fixed' ? !!form.expectedRent && !!form.expectedEscalation && !!form.expectedEscalationYears
     : form.rentType === 'mg_revshare' ? !!form.expectedRent && !!form.expectedRevshare
     : false;
   const ready = form.name && form.visitDate && form.city && form.model && form.spocName && form.googlePin && form.rentType && rentReady;
@@ -298,34 +298,47 @@ function NewPipelineModal({ onClose, onSubmit }) {
             </div>
           </div>
           {form.rentType === 'fixed' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={labelBase}>Expected rent</label>
-                <div style={{ display: 'flex', alignItems: 'stretch', height: 38, border: '1px solid var(--zm-line)', borderRadius: 6, background: 'var(--zm-bg)', overflow: 'hidden' }}>
-                  <span style={{ padding: '0 10px', display: 'flex', alignItems: 'center', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-mono)', fontSize: 12, background: 'var(--zm-surface-2)', borderRight: '1px solid var(--zm-line)' }}>₹</span>
-                  <input type="number" min="0" value={form.expectedRent} onChange={set('expectedRent')} placeholder="120000" style={{ flex: 1, border: 'none', outline: 'none', padding: '0 10px', background: 'transparent', fontFamily: 'var(--zm-font-mono)', fontFeatureSettings: "'tnum' 1", fontSize: 13.5, color: 'var(--zm-fg)' }}/>
-                  <span style={{ padding: '0 10px', display: 'flex', alignItems: 'center', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-mono)', fontSize: 12, background: 'var(--zm-surface-2)', borderLeft: '1px solid var(--zm-line)' }}>/mo</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={labelBase}>Expected rent</label>
+                  <div style={{ display: 'flex', alignItems: 'stretch', height: 38, border: '1px solid var(--zm-line)', borderRadius: 6, background: 'var(--zm-bg)', overflow: 'hidden' }}>
+                    <span style={{ padding: '0 10px', display: 'flex', alignItems: 'center', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-mono)', fontSize: 12, background: 'var(--zm-surface-2)', borderRight: '1px solid var(--zm-line)' }}>₹</span>
+                    <input type="number" min="0" step="any" value={form.expectedRent} onChange={set('expectedRent')} placeholder="120000" style={{ flex: 1, border: 'none', outline: 'none', padding: '0 10px', background: 'transparent', fontFamily: 'var(--zm-font-mono)', fontFeatureSettings: "'tnum' 1", fontSize: 13.5, color: 'var(--zm-fg)' }}/>
+                    <span style={{ padding: '0 10px', display: 'flex', alignItems: 'center', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-mono)', fontSize: 12, background: 'var(--zm-surface-2)', borderLeft: '1px solid var(--zm-line)' }}>/mo</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={labelBase}>Escalation</label>
+                  <div style={{ display: 'flex', alignItems: 'stretch', height: 38, border: '1px solid var(--zm-line)', borderRadius: 6, background: 'var(--zm-bg)', overflow: 'hidden' }}>
+                    <input type="number" min="0" step="any" value={form.expectedEscalation} onChange={set('expectedEscalation')} placeholder="e.g. 4.5" style={{ flex: 1, border: 'none', outline: 'none', padding: '0 10px', background: 'transparent', fontFamily: 'var(--zm-font-mono)', fontFeatureSettings: "'tnum' 1", fontSize: 13.5, color: 'var(--zm-fg)' }}/>
+                    <span style={{ padding: '0 10px', display: 'flex', alignItems: 'center', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-mono)', fontSize: 12, background: 'var(--zm-surface-2)', borderLeft: '1px solid var(--zm-line)' }}>%</span>
+                  </div>
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={labelBase}>Escalation</label>
+                <label style={labelBase}>Escalation cadence</label>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  {[1, 3, 5].map(pct => {
-                    const selected = String(form.expectedEscalation) === String(pct);
+                  {[
+                    { years: 1, label: 'Yearly' },
+                    { years: 3, label: 'Every 3 yrs' },
+                    { years: 5, label: 'Every 5 yrs' },
+                  ].map(opt => {
+                    const selected = String(form.expectedEscalationYears) === String(opt.years);
                     return (
                       <button
                         type="button"
-                        key={pct}
-                        onClick={() => setForm(prev => ({ ...prev, expectedEscalation: String(pct) }))}
+                        key={opt.years}
+                        onClick={() => setForm(prev => ({ ...prev, expectedEscalationYears: String(opt.years) }))}
                         style={{
                           flex: 1, height: 38, borderRadius: 6,
                           border: '1px solid ' + (selected ? 'var(--zm-accent)' : 'var(--zm-line)'),
                           background: selected ? 'var(--zm-accent-soft)' : 'var(--zm-bg)',
                           color: selected ? 'var(--zm-accent)' : 'var(--zm-fg)',
-                          fontFamily: 'var(--zm-font-mono)', fontFeatureSettings: "'tnum' 1",
+                          fontFamily: 'var(--zm-font-body)',
                           fontWeight: 600, fontSize: 13, cursor: 'pointer',
                         }}
-                      >{pct}% / yr</button>
+                      >{opt.label}</button>
                     );
                   })}
                 </div>
@@ -336,7 +349,7 @@ function NewPipelineModal({ onClose, onSubmit }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label style={labelBase}>Revenue share</label>
               <div style={{ display: 'flex', alignItems: 'stretch', height: 38, border: '1px solid var(--zm-line)', borderRadius: 6, background: 'var(--zm-bg)', overflow: 'hidden' }}>
-                <input type="number" min="0" step="0.1" value={form.expectedRevshare} onChange={set('expectedRevshare')} placeholder="12" style={{ flex: 1, border: 'none', outline: 'none', padding: '0 10px', background: 'transparent', fontFamily: 'var(--zm-font-mono)', fontFeatureSettings: "'tnum' 1", fontSize: 13.5, color: 'var(--zm-fg)' }}/>
+                <input type="number" min="0" step="any" value={form.expectedRevshare} onChange={set('expectedRevshare')} placeholder="e.g. 12.5" style={{ flex: 1, border: 'none', outline: 'none', padding: '0 10px', background: 'transparent', fontFamily: 'var(--zm-font-mono)', fontFeatureSettings: "'tnum' 1", fontSize: 13.5, color: 'var(--zm-fg)' }}/>
                 <span style={{ padding: '0 10px', display: 'flex', alignItems: 'center', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-mono)', fontSize: 12, background: 'var(--zm-surface-2)', borderLeft: '1px solid var(--zm-line)' }}>% of sales</span>
               </div>
             </div>
@@ -347,14 +360,14 @@ function NewPipelineModal({ onClose, onSubmit }) {
                 <label style={labelBase}>Minimum guarantee</label>
                 <div style={{ display: 'flex', alignItems: 'stretch', height: 38, border: '1px solid var(--zm-line)', borderRadius: 6, background: 'var(--zm-bg)', overflow: 'hidden' }}>
                   <span style={{ padding: '0 10px', display: 'flex', alignItems: 'center', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-mono)', fontSize: 12, background: 'var(--zm-surface-2)', borderRight: '1px solid var(--zm-line)' }}>₹</span>
-                  <input type="number" min="0" value={form.expectedRent} onChange={set('expectedRent')} placeholder="80000" style={{ flex: 1, border: 'none', outline: 'none', padding: '0 10px', background: 'transparent', fontFamily: 'var(--zm-font-mono)', fontFeatureSettings: "'tnum' 1", fontSize: 13.5, color: 'var(--zm-fg)' }}/>
+                  <input type="number" min="0" step="any" value={form.expectedRent} onChange={set('expectedRent')} placeholder="80000" style={{ flex: 1, border: 'none', outline: 'none', padding: '0 10px', background: 'transparent', fontFamily: 'var(--zm-font-mono)', fontFeatureSettings: "'tnum' 1", fontSize: 13.5, color: 'var(--zm-fg)' }}/>
                   <span style={{ padding: '0 10px', display: 'flex', alignItems: 'center', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-mono)', fontSize: 12, background: 'var(--zm-surface-2)', borderLeft: '1px solid var(--zm-line)' }}>/mo</span>
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <label style={labelBase}>Revenue share</label>
                 <div style={{ display: 'flex', alignItems: 'stretch', height: 38, border: '1px solid var(--zm-line)', borderRadius: 6, background: 'var(--zm-bg)', overflow: 'hidden' }}>
-                  <input type="number" min="0" step="0.1" value={form.expectedRevshare} onChange={set('expectedRevshare')} placeholder="12" style={{ flex: 1, border: 'none', outline: 'none', padding: '0 10px', background: 'transparent', fontFamily: 'var(--zm-font-mono)', fontFeatureSettings: "'tnum' 1", fontSize: 13.5, color: 'var(--zm-fg)' }}/>
+                  <input type="number" min="0" step="any" value={form.expectedRevshare} onChange={set('expectedRevshare')} placeholder="e.g. 12.5" style={{ flex: 1, border: 'none', outline: 'none', padding: '0 10px', background: 'transparent', fontFamily: 'var(--zm-font-mono)', fontFeatureSettings: "'tnum' 1", fontSize: 13.5, color: 'var(--zm-fg)' }}/>
                   <span style={{ padding: '0 10px', display: 'flex', alignItems: 'center', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-mono)', fontSize: 12, background: 'var(--zm-surface-2)', borderLeft: '1px solid var(--zm-line)' }}>% above MG</span>
                 </div>
               </div>

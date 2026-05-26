@@ -77,6 +77,7 @@ function siteFromServer(s) {
     expectedRent: s.expected_rent,
     rentType: s.rent_type,
     expectedEscalationPct: s.expected_escalation_pct,
+    expectedEscalationYears: s.expected_escalation_years,
     expectedRevsharePct: s.expected_revshare_pct,
   };
 }
@@ -112,6 +113,7 @@ export async function createSite(payload) {
     expected_rent: payload.expectedRent ?? null,
     rent_type: payload.rentType ?? null,
     expected_escalation_pct: payload.expectedEscalationPct ?? null,
+    expected_escalation_years: payload.expectedEscalationYears ?? null,
     expected_revshare_pct: payload.expectedRevsharePct ?? null,
   };
   return siteFromServer(await post('/sites', body));

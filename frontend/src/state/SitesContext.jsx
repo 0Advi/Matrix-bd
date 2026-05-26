@@ -251,6 +251,7 @@ export function SitesProvider({ children }) {
       rentType: form.rentType || null,
       expectedRent: form.expectedRent ? Number(form.expectedRent) : null,
       expectedEscalationPct: form.expectedEscalation ? Number(form.expectedEscalation) : null,
+      expectedEscalationYears: form.expectedEscalationYears ? Number(form.expectedEscalationYears) : null,
       expectedRevsharePct: form.expectedRevshare ? Number(form.expectedRevshare) : null,
       createdBy: { id: session?.id || session?.sub || undefined, name: sessionDisplayName },
       tenantId: user?.tenantId,

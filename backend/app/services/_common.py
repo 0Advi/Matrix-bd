@@ -100,6 +100,7 @@ def site_to_response(site: models.Site, created_by_name: str | None = None) -> S
         expected_escalation_pct=(
             float(site.expected_escalation_pct) if site.expected_escalation_pct is not None else None
         ),
+        expected_escalation_years=site.expected_escalation_years,
         expected_revshare_pct=(
             float(site.expected_revshare_pct) if site.expected_revshare_pct is not None else None
         ),

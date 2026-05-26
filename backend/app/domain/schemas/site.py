@@ -23,6 +23,7 @@ class CreateDraftRequest(BaseModel):
     rent_type: Optional[str] = None  # 'fixed' | 'revshare' | 'mg_revshare'
     # Conditional, depending on rent_type. None for the rest.
     expected_escalation_pct: Optional[float] = None
+    expected_escalation_years: Optional[int] = None
     expected_revshare_pct: Optional[float] = None
 
 
@@ -110,6 +111,7 @@ class SiteResponse(BaseModel):
     expected_rent: Optional[float] = None
     rent_type: Optional[str] = None
     expected_escalation_pct: Optional[float] = None
+    expected_escalation_years: Optional[int] = None
     expected_revshare_pct: Optional[float] = None
 
 

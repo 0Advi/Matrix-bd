@@ -99,6 +99,8 @@ class Site(Base):
     #   revshare    → expected_revshare_pct
     #   mg_revshare → expected_rent (MG floor) + expected_revshare_pct
     expected_escalation_pct: Mapped[Optional[float]] = mapped_column(Numeric(6, 2))
+    # Cadence in years for the escalation (1 = yearly, 3 = every 3 yrs, 5 = every 5 yrs).
+    expected_escalation_years: Mapped[Optional[int]] = mapped_column(Integer)
     expected_revshare_pct: Mapped[Optional[float]] = mapped_column(Numeric(6, 2))
     rent_set_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 

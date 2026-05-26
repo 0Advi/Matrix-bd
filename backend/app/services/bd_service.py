@@ -77,6 +77,7 @@ async def svc_create_draft(
     expected_rent: float | None = None,
     rent_type: str | None = None,
     expected_escalation_pct: float | None = None,
+    expected_escalation_years: int | None = None,
     expected_revshare_pct: float | None = None,
 ) -> SiteResponse:
     """Create a pipeline draft. One canonical implementation used by both
@@ -106,6 +107,7 @@ async def svc_create_draft(
             expected_rent=expected_rent,
             rent_type=rent_type,
             expected_escalation_pct=expected_escalation_pct,
+            expected_escalation_years=expected_escalation_years,
             expected_revshare_pct=expected_revshare_pct,
             rent_set_at=now if (
                 expected_rent is not None
