@@ -18,6 +18,7 @@ import TeamPage              from '../modules/team/TeamPage.jsx';
 import LegalStubPage         from '../modules/legal/LegalStubPage.jsx';
 import PaymentStubPage       from '../modules/payment/PaymentStubPage.jsx';
 import AdminPortalPage       from '../modules/admin/AdminPortalPage.jsx';
+import BusinessAdminPortalPage from '../modules/business-admin/BusinessAdminPortalPage.jsx';
 
 // In HTTP (non-mock) mode the landing page is the unauthenticated entry. The
 // existing app chrome only renders after a Supabase session is established.
@@ -47,6 +48,7 @@ export default function AppRouter() {
           users are platform operators, not tenant members. The page itself
           gates access via X-Platform-Admin-Key. */}
       <Route path="/admin" element={<AdminPortalPage/>}/>
+      <Route path="/business-admin" element={<BusinessAdminPortalPage/>}/>
 
       <Route element={<RequireAuth><App/></RequireAuth>}>
         <Route index                  element={<OverviewPage/>}/>
@@ -59,7 +61,7 @@ export default function AppRouter() {
           </RequireRole>
         }/>
         <Route path={ROUTES.STAGING_SUPERVISOR} element={
-          <RequireRole roles={['supervisor', 'sub_supervisor']}>
+          <RequireRole roles={['supervisor']}>
             <SupervisorStagingPage/>
           </RequireRole>
         }/>
@@ -67,7 +69,7 @@ export default function AppRouter() {
         <Route path={ROUTES.STAGING} element={<StagingRedirect/>}/>
 
         <Route path={ROUTES.ARCHIVE} element={
-          <RequireRole roles={['supervisor', 'sub_supervisor']}>
+          <RequireRole roles={['supervisor']}>
             <ArchivePage/>
           </RequireRole>
         }/>
