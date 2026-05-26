@@ -45,6 +45,9 @@ def issue_token(
     role: str,
     tenant_id: str,
     city: Optional[str] = None,
+    module: Optional[str] = None,
+    module_role: Optional[str] = None,
+    supervisor_id: Optional[str] = None,
     ttl_seconds: int = TOKEN_TTL_SECONDS,
 ) -> str:
     """Mint an HS256 JWT with the claim shape `decode_token` expects.
@@ -53,17 +56,24 @@ def issue_token(
     doesn't care whether the token came from us or from Supabase Auth.
     """
     now = dt.datetime.now(tz=dt.timezone.utc)
+    app_md: dict[str, Any] = {
+        "role":      role,
+        "tenant_id": tenant_id,
+        "city":      city,
+    }
+    if module is not None:
+        app_md["module"] = module
+    if module_role is not None:
+        app_md["module_role"] = module_role
+    if supervisor_id is not None:
+        app_md["supervisor_id"] = supervisor_id
     claims = {
         "sub":   sub,
         "aud":   settings.supabase_jwt_audience,
         "iat":   int(now.timestamp()),
         "exp":   int((now + dt.timedelta(seconds=ttl_seconds)).timestamp()),
         "email": email,
-        "app_metadata": {
-            "role":      role,
-            "tenant_id": tenant_id,
-            "city":      city,
-        },
+        "app_metadata": app_md,
         "user_metadata": {"full_name": name},
     }
     return jwt.encode(claims, settings.supabase_jwt_secret, algorithm="HS256")
@@ -82,7 +92,7 @@ def decode_token(token: str) -> dict[str, Any]:
           "sub":       <uuid string>,
           "name":      <display name from user_metadata.full_name or email>,
           "email":     <email>,
-          "role":      <executive | supervisor | sub_supervisor | system>,
+          "role":      <business_admin | supervisor | executive | system>,
           "tenant_id": <uuid string>,
           "city":      <city slug or None>,
         }
