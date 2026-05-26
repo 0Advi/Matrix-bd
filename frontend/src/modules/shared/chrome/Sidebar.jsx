@@ -56,12 +56,13 @@ export default function Sidebar({ counts, role, onRole }) {
   const location = useLocation();
   const { session } = useSession();
   // Unit 6 will start emitting `module` on the JWT/session. Until then default
-  // to 'bd' so existing BD users keep their current sidebar.
-  const userModule = session?.module || 'bd';
-  const isStubModule = userModule === 'legal' || userModule === 'payment';
+  // to the current route for mock previews, then to 'bd' for existing BD users.
+  const path = location.pathname;
+  const routeModule = path.startsWith('/legal') ? 'legal' : path.startsWith('/payment') ? 'payment' : 'bd';
+  const userModule = session?.module || routeModule;
+  const isModuleSurface = userModule === 'legal' || userModule === 'payment';
 
   // Active view derived from current URL path
-  const path = location.pathname;
   const activeView =
     path === ROUTES.OVERVIEW                              ? 'overview'  :
     path === ROUTES.PIPELINE                             ? 'pipeline'  :
@@ -69,22 +70,25 @@ export default function Sidebar({ counts, role, onRole }) {
     path.startsWith('/staging')                          ? 'staging'   :
     path === ROUTES.ARCHIVE                              ? 'archive'   :
     path === ROUTES.TEAM                                 ? 'team'      :
+    path.startsWith('/legal')                            ? 'legal-ddr' :
+    path.startsWith('/payment')                          ? 'payment-licensing' :
     'overview';
 
   const go = (route) => navigate(route);
+  const canSeeTeam = role === 'supervisor' || role === 'executive' || role === 'exec';
+  const executiveLabel = isModuleSurface ? 'Executive' : 'BD exec';
 
   return (
-    <aside style={{
+    <aside className="zm-sidebar" style={{
       width: 232, flex: '0 0 232px', padding: '14px 12px',
       background: 'var(--zm-surface)', borderRight: '1px solid var(--zm-line)',
       display: 'flex', flexDirection: 'column', gap: 2,
       overflowY: 'auto',
     }}>
-      <div style={{ ...SECTION_HEADING_STYLE, padding: '4px 10px 6px' }}>Overview</div>
-      <SidebarItem icon="trend" label="Sites" active={activeView === 'overview'} onClick={() => go(ROUTES.OVERVIEW)}/>
-
-      {!isStubModule && (
+      {!isModuleSurface && (
         <>
+          <div style={{ ...SECTION_HEADING_STYLE, padding: '4px 10px 6px' }}>Overview</div>
+          <SidebarItem icon="trend" label="Sites" active={activeView === 'overview'} onClick={() => go(ROUTES.OVERVIEW)}/>
           <div style={SECTION_HEADING_STYLE}>Workflow</div>
           <SidebarItem icon="file"   label="Pipeline"        count={counts.pipeline}  active={activeView === 'pipeline'}  onClick={() => go(ROUTES.PIPELINE)}/>
           <SidebarItem icon="shield" label="Shortlist queue" count={counts.shortlist} active={activeView === 'shortlist'} onClick={() => go(ROUTES.SHORTLIST)}/>
@@ -95,7 +99,31 @@ export default function Sidebar({ counts, role, onRole }) {
         </>
       )}
 
-      {role === 'supervisor' && (
+      {userModule === 'legal' && (
+        <>
+          <div style={{ ...SECTION_HEADING_STYLE, padding: '4px 10px 6px' }}>Legal</div>
+          <SidebarItem
+            icon="shield"
+            label="DDR checklist"
+            active={activeView === 'legal-ddr'}
+            onClick={() => go(ROUTES.LEGAL_DDR)}
+          />
+        </>
+      )}
+
+      {userModule === 'payment' && (
+        <>
+          <div style={{ ...SECTION_HEADING_STYLE, padding: '4px 10px 6px' }}>Payment</div>
+          <SidebarItem
+            icon="card"
+            label="Licensing"
+            active={activeView === 'payment-licensing'}
+            onClick={() => go(ROUTES.PAYMENT_LICENSING)}
+          />
+        </>
+      )}
+
+      {canSeeTeam && (
         <>
           <div style={SECTION_HEADING_STYLE}>Workspace</div>
           <SidebarItem
@@ -131,7 +159,7 @@ export default function Sidebar({ counts, role, onRole }) {
             }}
           >
             <option value="supervisor">Supervisor</option>
-            <option value="exec">BD exec</option>
+            <option value="exec">{executiveLabel}</option>
           </select>
         </div>
       )}

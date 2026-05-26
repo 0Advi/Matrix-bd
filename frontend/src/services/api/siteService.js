@@ -52,7 +52,9 @@ export async function uploadLoi(siteId, file, uploadedBy) {
 }
 
 export async function pushToPayments(siteId, by) {
-  return transitionSite(siteId, SiteStatus.PUSHED_TO_PAYMENTS, { by });
+  // Compatibility wrapper for the existing "push" button. After PR #4's
+  // workflow change, BD push no longer terminates in Payments; it starts Legal.
+  return transitionSite(siteId, SiteStatus.LEGAL_REVIEW, { by });
 }
 
 export async function rejectSite(siteId, reasons, comment, by) {

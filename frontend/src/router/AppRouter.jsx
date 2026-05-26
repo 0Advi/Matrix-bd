@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ROUTES } from './routes.js';
-import { RequireRole } from './guards.jsx';
+import { RequireModule, RequireRole } from './guards.jsx';
 import { useSession } from '../state/SessionContext.jsx';
 import { useAuthToken } from '../state/useAuthToken.js';
 
@@ -15,8 +15,8 @@ import SupervisorStagingPage from '../modules/staging/supervisor/SupervisorStagi
 import ArchivePage           from '../modules/archive/ArchivePage.jsx';
 import AddDetailsPage        from '../modules/loi/details/AddDetailsPage.jsx';
 import TeamPage              from '../modules/team/TeamPage.jsx';
-import LegalStubPage         from '../modules/legal/LegalStubPage.jsx';
-import PaymentStubPage       from '../modules/payment/PaymentStubPage.jsx';
+import DdrPage               from '../modules/legal/ddr/DdrPage.jsx';
+import LicensingPage         from '../modules/payment/licensing/LicensingPage.jsx';
 import AdminPortalPage       from '../modules/admin/AdminPortalPage.jsx';
 import BusinessAdminPortalPage from '../modules/business-admin/BusinessAdminPortalPage.jsx';
 
@@ -106,16 +106,25 @@ export default function AppRouter() {
           </RequireRole>
         }/>
 
-        <Route path="/legal/*" element={
-          <RequireRole roles={['supervisor', 'executive']}>
-            <LegalStubPage/>
+        <Route path={ROUTES.LEGAL} element={<Navigate to={ROUTES.LEGAL_DDR} replace/>}/>
+        <Route path={ROUTES.LEGAL_DDR} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['legal']}>
+              <DdrPage/>
+            </RequireModule>
           </RequireRole>
         }/>
-        <Route path="/payment/*" element={
-          <RequireRole roles={['supervisor', 'executive']}>
-            <PaymentStubPage/>
+        <Route path="/legal/*" element={<Navigate to={ROUTES.LEGAL_DDR} replace/>}/>
+
+        <Route path={ROUTES.PAYMENT} element={<Navigate to={ROUTES.PAYMENT_LICENSING} replace/>}/>
+        <Route path={ROUTES.PAYMENT_LICENSING} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['payment']}>
+              <LicensingPage/>
+            </RequireModule>
           </RequireRole>
         }/>
+        <Route path="/payment/*" element={<Navigate to={ROUTES.PAYMENT_LICENSING} replace/>}/>
 
         {/* Sub-path routes for shortlist details / timeline — rendered as full pages */}
         <Route path={ROUTES.ADD_DETAILS}   element={<ShortlistPage/>}/>

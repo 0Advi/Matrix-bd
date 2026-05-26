@@ -8,6 +8,9 @@ export const SiteStatus = {
   DETAILS_SUBMITTED:  'details_submitted',
   APPROVED:           'approved',
   LOI_UPLOADED:       'loi_uploaded',
+  LEGAL_REVIEW:       'legal_review',
+  LEGAL_APPROVED:     'legal_approved',
+  LEGAL_REJECTED:     'legal_rejected',
   PUSHED_TO_PAYMENTS: 'pushed_to_payments',
   REJECTED:           'rejected',
   ARCHIVED:           'archived',
@@ -19,7 +22,10 @@ export const ALLOWED_TRANSITIONS = {
   [SiteStatus.SHORTLISTED]:        [SiteStatus.DETAILS_SUBMITTED, SiteStatus.REJECTED, SiteStatus.ARCHIVED],
   [SiteStatus.DETAILS_SUBMITTED]:  [SiteStatus.APPROVED, SiteStatus.REJECTED, SiteStatus.ARCHIVED],
   [SiteStatus.APPROVED]:           [SiteStatus.LOI_UPLOADED, SiteStatus.REJECTED, SiteStatus.ARCHIVED],
-  [SiteStatus.LOI_UPLOADED]:       [SiteStatus.PUSHED_TO_PAYMENTS, SiteStatus.REJECTED, SiteStatus.ARCHIVED],
+  [SiteStatus.LOI_UPLOADED]:       [SiteStatus.LEGAL_REVIEW, SiteStatus.REJECTED, SiteStatus.ARCHIVED],
+  [SiteStatus.LEGAL_REVIEW]:       [SiteStatus.LEGAL_APPROVED, SiteStatus.LEGAL_REJECTED],
+  [SiteStatus.LEGAL_APPROVED]:     [SiteStatus.PUSHED_TO_PAYMENTS],
+  [SiteStatus.LEGAL_REJECTED]:     [],
   [SiteStatus.PUSHED_TO_PAYMENTS]: [], // terminal
   [SiteStatus.REJECTED]:           [], // terminal
   [SiteStatus.ARCHIVED]:           [], // terminal
@@ -45,6 +51,9 @@ export const LEGACY_STAGE_MAP = {
   staging:     SiteStatus.APPROVED,
   overdue:     SiteStatus.APPROVED,
   uploaded:    SiteStatus.LOI_UPLOADED,
+  legal_review: SiteStatus.LEGAL_REVIEW,
+  legal_approved: SiteStatus.LEGAL_APPROVED,
+  legal_rejected: SiteStatus.LEGAL_REJECTED,
   completed:   SiteStatus.PUSHED_TO_PAYMENTS,
   rejected:    SiteStatus.REJECTED,
   archived:    SiteStatus.ARCHIVED,
@@ -57,6 +66,9 @@ const STATUS_TO_LEGACY = {
   [SiteStatus.DETAILS_SUBMITTED]:  'shortlist', // inReview is derived separately via inReview boolean
   [SiteStatus.APPROVED]:           'staging',
   [SiteStatus.LOI_UPLOADED]:       'uploaded',
+  [SiteStatus.LEGAL_REVIEW]:       'legal_review',
+  [SiteStatus.LEGAL_APPROVED]:     'legal_approved',
+  [SiteStatus.LEGAL_REJECTED]:     'legal_rejected',
   [SiteStatus.PUSHED_TO_PAYMENTS]: 'completed',
   [SiteStatus.REJECTED]:           'rejected',
   [SiteStatus.ARCHIVED]:           'archived',

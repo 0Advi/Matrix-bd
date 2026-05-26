@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useSession } from './state/SessionContext.jsx';
 import { useSites } from './state/SitesContext.jsx';
@@ -24,12 +24,17 @@ export default function App() {
   const [openSite, setOpenSite] = useState(null);
   const [showNew, setShowNew] = useState(false);
   const [toast, setToast] = useState(null);
+  const mainRef = useRef(null);
 
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3400);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+  }, [location.pathname]);
 
   // SiteDrawer driven by URL search param ?site=<id>
   useEffect(() => {
@@ -109,7 +114,7 @@ export default function App() {
       <div style={{ flex: 1, display: 'flex', minHeight: 0, position: 'relative' }}>
         <Sidebar counts={counts} role={role} onRole={setRole}/>
 
-        <main style={{
+        <main ref={mainRef} className="zm-app-main" style={{
           flex: 1, overflowY: 'auto', padding: '24px 32px 64px',
           background: 'var(--zm-bg)',
           backgroundImage: "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'><path d='M40 0 L0 0 0 40' fill='none' stroke='" + (dark ? '%23E2E8F0' : '%23111827') + "' stroke-width='0.5' opacity='0.04'/></svg>\")",

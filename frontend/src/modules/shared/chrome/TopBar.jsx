@@ -164,8 +164,8 @@ export default function TopBar({ user, role, dark, onToggleDark, onNewPipeline, 
                   background: role === 'supervisor' ? 'var(--zm-accent)' : 'var(--zm-fg-3)',
                 }}/>
                 {role === 'supervisor' ? 'Supervisor' :
-                 role === 'exec' || role === 'executive' ? 'BD executive' :
-                 (role || 'BD executive')}
+                 role === 'exec' || role === 'executive' ? 'Executive' :
+                 (role || 'Executive')}
               </span>
             </div>
             <Icon name="chevronDown" size={12} style={{ color: 'var(--zm-fg-3)' }}/>

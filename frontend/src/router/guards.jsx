@@ -18,6 +18,23 @@ export function RequireRole({ roles, children }) {
   return children;
 }
 
+// RequireModule: soft-gates module routes by the JWT/session module claim.
+// In mock mode the module is usually absent, so absence is allowed for previews.
+// Once hydrated in HTTP mode, a legal user cannot browse payment pages, and vice versa.
+export function RequireModule({ modules, children }) {
+  const { session } = useSession();
+  const module = session?.module;
+  if (module && !modules.includes(module)) {
+    const fallback = module === 'legal'
+      ? ROUTES.LEGAL_DDR
+      : module === 'payment'
+        ? ROUTES.PAYMENT_LICENSING
+        : ROUTES.OVERVIEW;
+    return <Navigate to={fallback} replace />;
+  }
+  return children;
+}
+
 // RequireScope: gates a route by scope kind.
 // `kind` is 'own' | 'city' | 'department' | 'tenant'
 // For the current MVP with a mock session this always passes — wire real logic

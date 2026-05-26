@@ -13,8 +13,8 @@ import { useSession } from './SessionContext.jsx';
 //   draft.createdBy      <- mapped from site.createdBy.name (string for render)
 //   shortlist.inReview   <- status === DETAILS_SUBMITTED
 //   shortlist.stage      <- legacyStageFor(status)
-//   staging.loiUploaded  <- status === LOI_UPLOADED || status === PUSHED_TO_PAYMENTS
-//   staging.pushed       <- status === PUSHED_TO_PAYMENTS
+//   staging.loiUploaded  <- status >= LOI_UPLOADED in the BD→Legal→Payments flow
+//   staging.pushed       <- status has left LOI_UPLOADED for Legal/Payments
 //   staging.daysSinceApproval <- site._daysSinceApproval (stored on canonical site)
 //   staging.draftDate    <- site._draftDate
 //   staging.approvedDate <- site._approvedDate
@@ -76,8 +76,13 @@ function toShortlistShape(site) {
 
 // Map canonical site to legacy staging shape expected by ExecStagingPage and SupervisorStagingPage
 function toStagingShape(site) {
-  const loiUploaded = site.status === SiteStatus.LOI_UPLOADED || site.status === SiteStatus.PUSHED_TO_PAYMENTS;
-  const pushed = site.status === SiteStatus.PUSHED_TO_PAYMENTS;
+  const legalOrPaymentStatus = [
+    SiteStatus.LEGAL_REVIEW,
+    SiteStatus.LEGAL_APPROVED,
+    SiteStatus.PUSHED_TO_PAYMENTS,
+  ].includes(site.status);
+  const loiUploaded = site.status === SiteStatus.LOI_UPLOADED || legalOrPaymentStatus;
+  const pushed = legalOrPaymentStatus;
   return {
     ...site,
     id: site.id,
@@ -151,12 +156,14 @@ export function SitesProvider({ children }) {
       .map(toShortlistShape),
   [sites]);
 
-  // All staging sites: APPROVED + LOI_UPLOADED + PUSHED_TO_PAYMENTS
+  // All staging/downstream sites: APPROVED + LOI_UPLOADED + Legal + Payments.
   const staging = useMemo(() =>
     sites
       .filter(s =>
         s.status === SiteStatus.APPROVED ||
         s.status === SiteStatus.LOI_UPLOADED ||
+        s.status === SiteStatus.LEGAL_REVIEW ||
+        s.status === SiteStatus.LEGAL_APPROVED ||
         s.status === SiteStatus.PUSHED_TO_PAYMENTS
       )
       .map(toStagingShape),
@@ -164,7 +171,7 @@ export function SitesProvider({ children }) {
 
   const archive = useMemo(() =>
     sites
-      .filter(s => s.status === SiteStatus.ARCHIVED || s.status === SiteStatus.REJECTED)
+      .filter(s => s.status === SiteStatus.ARCHIVED || s.status === SiteStatus.REJECTED || s.status === SiteStatus.LEGAL_REJECTED)
       .map(toArchiveShape),
   [sites]);
 

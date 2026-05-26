@@ -79,6 +79,9 @@ function siteFromServer(s) {
     expectedEscalationPct: s.expected_escalation_pct,
     expectedEscalationYears: s.expected_escalation_years,
     expectedRevsharePct: s.expected_revshare_pct,
+    legalDdStatus: s.legal_dd_status,
+    agreementStatus: s.agreement_status,
+    licensingStatus: s.licensing_status,
   };
 }
 
