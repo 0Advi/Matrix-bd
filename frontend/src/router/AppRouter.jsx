@@ -27,15 +27,24 @@ const LANDING_PATH = '/welcome';
 
 function RequireAuth({ children }) {
   const token = useAuthToken();
+  const { role } = useSession();
   if (USE_MOCK) return children; // mock mode is always "signed in"
   if (!token)   return <Navigate to={LANDING_PATH} replace/>;
+  // Business admins have no presence in the tenant app shell — their entire
+  // surface lives at /business-admin. Forward them out of any BD/legal/payment
+  // route so they cannot land on a chrome that isn't meant for them.
+  if (role === 'business_admin') return <Navigate to="/business-admin" replace/>;
   return children;
 }
 
 function LandingRedirectIfAuthed() {
   // Send signed-in users away from the marketing page back to the dashboard.
   const token = useAuthToken();
-  if (!USE_MOCK && token) return <Navigate to={ROUTES.OVERVIEW} replace/>;
+  const { role } = useSession();
+  if (!USE_MOCK && token) {
+    const dest = role === 'business_admin' ? '/business-admin' : ROUTES.OVERVIEW;
+    return <Navigate to={dest} replace/>;
+  }
   return <LandingPage/>;
 }
 
