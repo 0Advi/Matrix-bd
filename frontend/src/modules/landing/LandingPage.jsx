@@ -295,11 +295,19 @@ export default function LandingPage() {
         try {
           const data = await signInWithWorkspaceCode(email, code);
           close();
-          // Route by role. /business-admin lands when Unit 9's router entry
-          // exists; until then the catch-all in AppRouter falls through to /.
+          // Route by role + module. business_admin gets the dedicated portal;
+          // supervisor/executive land in their own module (legal/payment have
+          // their own stub portals, BD is the full-feature default).
           const payload = decodeJwtPayload(data?.access_token);
-          if (payload?.role === 'business_admin') navigate('/business-admin');
-          else                                    navigate('/overview');
+          if (payload?.role === 'business_admin') {
+            navigate('/business-admin');
+          } else if (payload?.module === 'legal') {
+            navigate('/legal');
+          } else if (payload?.module === 'payment') {
+            navigate('/payment');
+          } else {
+            navigate('/overview');
+          }
         } catch (err) {
           if (err && err.isPending) {
             // Special-case the "queued" response so the messaging is warm,

@@ -129,4 +129,7 @@ def decode_token(token: str) -> dict[str, Any]:
         "role": role,
         "tenant_id": tenant_id,
         "city": app_md.get("city"),
+        "module": app_md.get("module"),
+        "module_role": app_md.get("module_role"),
+        "supervisor_id": app_md.get("supervisor_id"),
     }

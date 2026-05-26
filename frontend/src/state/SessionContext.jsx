@@ -59,6 +59,7 @@ export function SessionProvider({ children }) {
           role:      claims.role || INITIAL_SESSION.role,
           tenantId:  claims.tenant_id || INITIAL_SESSION.tenantId,
           cityScope: claims.city || INITIAL_SESSION.cityScope,
+          module:    claims.module || null,
         });
       } catch (err) {
         // 401/403 → token is stale or app_metadata missing. Clear so the UI

@@ -25,6 +25,13 @@ import BusinessAdminPortalPage from '../modules/business-admin/BusinessAdminPort
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true' || import.meta.env.VITE_USE_MOCK === true;
 const LANDING_PATH = '/welcome';
 
+function homeForRoleModule(role, module) {
+  if (role === 'business_admin') return '/business-admin';
+  if (module === 'legal')        return '/legal';
+  if (module === 'payment')      return '/payment';
+  return ROUTES.OVERVIEW; // BD (or unknown → default to BD)
+}
+
 function RequireAuth({ children }) {
   const token = useAuthToken();
   const { role } = useSession();
@@ -38,14 +45,24 @@ function RequireAuth({ children }) {
 }
 
 function LandingRedirectIfAuthed() {
-  // Send signed-in users away from the marketing page back to the dashboard.
+  // Send signed-in users away from the marketing page back to their module home.
   const token = useAuthToken();
-  const { role } = useSession();
+  const { role, session } = useSession();
   if (!USE_MOCK && token) {
-    const dest = role === 'business_admin' ? '/business-admin' : ROUTES.OVERVIEW;
-    return <Navigate to={dest} replace/>;
+    return <Navigate to={homeForRoleModule(role, session?.module)} replace/>;
   }
   return <LandingPage/>;
+}
+
+function IndexRedirect() {
+  // The root `/` defaults to the BD overview. For legal/payment supervisors
+  // that's the wrong chrome — bounce them to their module stub.
+  const { role, session } = useSession();
+  const module = session?.module;
+  if (USE_MOCK) return <OverviewPage/>; // mock mode stays on BD
+  if (module === 'legal')   return <Navigate to="/legal" replace/>;
+  if (module === 'payment') return <Navigate to="/payment" replace/>;
+  return <OverviewPage/>;
 }
 
 export default function AppRouter() {
@@ -60,7 +77,7 @@ export default function AppRouter() {
       <Route path="/business-admin" element={<BusinessAdminPortalPage/>}/>
 
       <Route element={<RequireAuth><App/></RequireAuth>}>
-        <Route index                  element={<OverviewPage/>}/>
+        <Route index                  element={<IndexRedirect/>}/>
         <Route path={ROUTES.PIPELINE}  element={<DraftsPage/>}/>
         <Route path={ROUTES.SHORTLIST} element={<ShortlistPage/>}/>
 
