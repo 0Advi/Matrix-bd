@@ -27,7 +27,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import text
 
 from app.core.deps import CurrentUser, DbDep
@@ -73,6 +73,21 @@ class LoginOut(BaseModel):
 class PendingOut(BaseModel):
     status:  str = "pending"
     message: str
+
+
+class SupervisorSignupIn(BaseModel):
+    email:     EmailStr
+    dept_code: str
+
+
+class ExecutiveSignupIn(BaseModel):
+    email:           EmailStr
+    supervisor_code: str
+
+
+class SignupAcceptedOut(BaseModel):
+    message: str
+    user_id: str
 
 
 @router.post(
@@ -151,7 +166,17 @@ async def login(payload: LoginIn, db: DbDep):
     if not user["is_active"]:
         return _pending_response(payload.email)
 
-    # 4. Active user → mint a JWT.
+    # 4. Active user → mint a JWT. Optionally enrich with module membership.
+    membership = (await db.execute(
+        text("""
+            SELECT module, role_in_module, supervisor_id
+              FROM user_module_memberships
+             WHERE user_id = :uid
+             LIMIT 1
+        """),
+        {"uid": user["id"]},
+    )).mappings().first() or {}
+    supervisor_id = membership.get("supervisor_id")
     token = issue_token(
         sub=str(user["id"]),
         email=user["email"],
@@ -159,6 +184,9 @@ async def login(payload: LoginIn, db: DbDep):
         role=user["role"],
         tenant_id=str(tenant["id"]),
         city=user["assigned_city"],
+        module=membership.get("module"),
+        module_role=membership.get("role_in_module"),
+        supervisor_id=str(supervisor_id) if supervisor_id else None,
     )
     return LoginOut(
         access_token=token,
@@ -171,6 +199,137 @@ async def login(payload: LoginIn, db: DbDep):
             "tenant_name": tenant["name"],
             "city":       user["assigned_city"],
         },
+    )
+
+
+@router.post(
+    "/signup/supervisor",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Public: sign up as a supervisor candidate using a dept_code",
+    responses={
+        202: {"description": "Pending — business_admin must approve"},
+        404: {"description": "Invalid or revoked dept_code"},
+        409: {"description": "Email already active in this workspace"},
+    },
+)
+async def signup_supervisor(
+    payload: SupervisorSignupIn, db: DbDep,
+) -> SignupAcceptedOut:
+    code_row = (await db.execute(
+        text("""
+            SELECT tenant_id, module
+              FROM module_codes
+             WHERE code = :code AND revoked_at IS NULL
+        """),
+        {"code": payload.dept_code},
+    )).mappings().first()
+    if not code_row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="That dept code is not valid.",
+        )
+    return await _enqueue_signup(
+        db,
+        tenant_id=code_row["tenant_id"],
+        email=payload.email,
+        role="supervisor",
+        notes=f"pending_module:{code_row['module']}",
+    )
+
+
+@router.post(
+    "/signup/executive",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Public: sign up as an executive candidate using a supervisor_code",
+    responses={
+        202: {"description": "Pending — supervisor must approve"},
+        404: {"description": "Invalid or revoked supervisor_code"},
+        409: {"description": "Email already active in this workspace"},
+    },
+)
+async def signup_executive(
+    payload: ExecutiveSignupIn, db: DbDep,
+) -> SignupAcceptedOut:
+    code_row = (await db.execute(
+        text("""
+            SELECT tenant_id, supervisor_id, module
+              FROM supervisor_invite_codes
+             WHERE code = :code AND revoked_at IS NULL
+        """),
+        {"code": payload.supervisor_code},
+    )).mappings().first()
+    if not code_row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="That supervisor code is not valid.",
+        )
+    return await _enqueue_signup(
+        db,
+        tenant_id=code_row["tenant_id"],
+        email=payload.email,
+        role="executive",
+        notes=(
+            f"pending_supervisor:{code_row['supervisor_id']}"
+            f"|module:{code_row['module']}"
+        ),
+    )
+
+
+async def _enqueue_signup(
+    db,
+    *,
+    tenant_id,
+    email: str,
+    role: str,
+    notes: str,
+) -> SignupAcceptedOut:
+    """Shared dedupe + insert path for the two signup endpoints.
+
+    Returns 202 if a pending row already exists or a new one is created.
+    Raises 409 if the email is already active in the tenant.
+    """
+    existing = (await db.execute(
+        text("""
+            SELECT id, is_active
+              FROM users
+             WHERE tenant_id = :tid AND lower(email) = lower(:email)
+        """),
+        {"tid": tenant_id, "email": email},
+    )).mappings().first()
+    if existing:
+        if existing["is_active"]:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="That email is already active in this workspace.",
+            )
+        return SignupAcceptedOut(
+            message="Signup already pending approval.",
+            user_id=str(existing["id"]),
+        )
+
+    new_id = uuid.uuid4()
+    await db.execute(
+        text("""
+            INSERT INTO users (id, tenant_id, role, email, name, is_active, notes)
+            VALUES (:id, :tid, :role, :email, :name, false, :notes)
+        """),
+        {
+            "id":    new_id,
+            "tid":   tenant_id,
+            "role":  role,
+            "email": email,
+            "name":  email.split("@")[0],
+            "notes": notes,
+        },
+    )
+    await db.commit()
+    logger.info(
+        "signup: queued %s tenant_id=%s email=%s",
+        role, tenant_id, email,
+    )
+    return SignupAcceptedOut(
+        message="Signup received. Awaiting approval.",
+        user_id=str(new_id),
     )
 
 
