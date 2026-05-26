@@ -18,6 +18,30 @@ export function RequireRole({ roles, children }) {
   return children;
 }
 
+// RequireModule: gates module routes by the JWT/session module claim.
+// In mock mode (no session) we allow access so previews keep working; in HTTP
+// mode the session must carry the matching `module` claim. Business admins and
+// any user with a missing/mismatched module get bounced back to their home —
+// never silently shown a page that 403s on every request.
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true' || import.meta.env.VITE_USE_MOCK === true;
+
+function homeForSession(role, module) {
+  if (role === 'business_admin') return '/business-admin';
+  if (module === 'legal')        return ROUTES.LEGAL;
+  if (module === 'payment')      return ROUTES.PAYMENT;
+  return ROUTES.OVERVIEW;
+}
+
+export function RequireModule({ modules, children }) {
+  const { role, session } = useSession();
+  if (USE_MOCK) return children;
+  const module = session?.module;
+  if (!module || !modules.includes(module)) {
+    return <Navigate to={homeForSession(role, module)} replace />;
+  }
+  return children;
+}
+
 // RequireScope: gates a route by scope kind.
 // `kind` is 'own' | 'city' | 'department' | 'tenant'
 // For the current MVP with a mock session this always passes — wire real logic

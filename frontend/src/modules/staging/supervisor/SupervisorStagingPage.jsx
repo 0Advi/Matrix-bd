@@ -31,7 +31,7 @@ function StagingKpiStripSupervisor({ sites }) {
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
       <KpiTile label="Median · draft → LOI" value={medDraftToLoi == null ? '—' : `${medDraftToLoi}d`} sub={uploaded.length ? `${uploaded.length} LOI${uploaded.length === 1 ? '' : 's'} uploaded` : 'no LOIs yet'}/>
       <KpiTile label="LOI on-time rate" value={hitRate == null ? '—' : `${hitRate}%`} sub={uploaded.length ? `${onTime} on time · ${late} late` : 'pending uploads'} tone={hitRate == null ? 'neutral' : hitRate >= 80 ? 'good' : hitRate >= 50 ? 'warn' : 'bad'}/>
-      <KpiTile label="LOIs awaiting push" value={String(uploaded.filter(s => !s.pushed).length).padStart(2,'0')} sub="ready for Payments module"/>
+      <KpiTile label="LOIs awaiting legal" value={String(uploaded.filter(s => !s.pushed).length).padStart(2,'0')} sub="ready for Legal review"/>
     </div>
   );
 }
@@ -62,17 +62,22 @@ function TimelineTracker({ site }) {
 
 function SupervisorRow({ site, onPush, onViewLOI, onOpen }) {
   const pushed = site.pushed;
+  const pushedLabel = site.stage === 'legal_review'
+    ? 'In legal'
+    : site.stage === 'legal_approved'
+      ? 'Legal cleared'
+      : 'Pushed';
   return (
     <div className="zm-row" style={{ display: 'grid', gridTemplateColumns: '70px minmax(130px, 0.9fr) 70px 124px minmax(170px, 1.3fr) 170px', alignItems: 'center', gap: 10, padding: '14px 12px', borderBottom: '1px solid var(--zm-line-faint)', background: pushed ? 'rgba(4,120,87,0.04)' : 'transparent', opacity: pushed ? 0.85 : 1 }}>
       <span style={{ fontFamily: 'var(--zm-font-mono)', fontSize: 11.5, color: 'var(--zm-fg-3)' }}>{site.code}</span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}><span style={{ fontFamily: 'var(--zm-font-body)', fontSize: 13.5, fontWeight: 600, color: 'var(--zm-fg)' }}>{site.name}</span><span style={{ fontFamily: 'var(--zm-font-mono)', fontSize: 10.5, color: 'var(--zm-fg-3)' }}>by {site.createdBy}</span></div>
       <span style={{ fontFamily: 'var(--zm-font-body)', fontSize: 13, color: 'var(--zm-fg)' }}>{site.city}</span>
-      <div>{pushed ? <StatusPill stage="completed"/> : <StatusPill stage="uploaded"/>}</div>
+      <div><StatusPill stage={pushed ? site.stage : 'uploaded'}/></div>
       <div style={{ minWidth: 0, overflow: 'hidden' }}><TimelineTracker site={site}/></div>
       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', minWidth: 0 }}>
         <button onClick={() => onOpen(site)} title="View site" className="zm-icon-btn" style={{ width: 32, height: 32, padding: 0, border: '1px solid var(--zm-line)', borderRadius: 7, background: 'transparent', color: 'var(--zm-fg)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 32px' }}><EyeIcon size={14}/></button>
         <button onClick={() => onViewLOI(site)} title="View LOI" className="zm-icon-btn" style={{ width: 32, height: 32, padding: 0, border: '1px solid var(--zm-line)', borderRadius: 7, background: 'transparent', color: 'var(--zm-fg)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 32px' }}><Icon name="file" size={14}/></button>
-        {pushed ? (<button disabled style={{ height: 32, padding: '0 12px', border: '1px solid var(--zm-line)', borderRadius: 7, background: 'var(--zm-surface)', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-body)', fontSize: 12, fontWeight: 600, cursor: 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', lineHeight: 1, flex: '0 0 auto' }}><Icon name="check" size={12}/> Pushed</button>) : (<button onClick={() => onPush(site)} className="zm-btn-primary" style={{ flex: '1 1 auto', minWidth: 100, height: 32, padding: '0 12px', border: 'none', borderRadius: 7, background: 'var(--zm-accent)', color: '#fff', fontFamily: 'var(--zm-font-body)', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap', lineHeight: 1, boxShadow: 'var(--zm-shadow-1)' }}>Push site <Icon name="arrow" size={12}/></button>)}
+        {pushed ? (<button disabled style={{ height: 32, padding: '0 12px', border: '1px solid var(--zm-line)', borderRadius: 7, background: 'var(--zm-surface)', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-body)', fontSize: 12, fontWeight: 600, cursor: 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', lineHeight: 1, flex: '0 0 auto' }}><Icon name="check" size={12}/> {pushedLabel}</button>) : (<button onClick={() => onPush(site)} className="zm-btn-primary" style={{ flex: '1 1 auto', minWidth: 100, height: 32, padding: '0 12px', border: 'none', borderRadius: 7, background: 'var(--zm-accent)', color: '#fff', fontFamily: 'var(--zm-font-body)', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap', lineHeight: 1, boxShadow: 'var(--zm-shadow-1)' }}>Send legal <Icon name="arrow" size={12}/></button>)}
       </div>
     </div>
   );
@@ -101,13 +106,13 @@ export default function SupervisorStagingPage({ onOpenSite: onOpenSiteProp, show
   const visibleStaging = staging.filter(s => s.loiUploaded === true);
   const filtered = applyStagingFilters(visibleStaging, filters);
 
-  const onPush = (site) => { pushSite(site); showToast?.(`Pushed · ${site.name} sent to Payments module.`); };
+  const onPush = (site) => { pushSite(site); showToast?.(`Sent · ${site.name} moved to Legal review.`); };
   const onViewLOI = (site) => { showToast?.(`Opening LOI · ${site.name} (mock).`); };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <PageHeader file="№ 04" eyebrow="Workflow · Staging" title={<>LOIs <em>awaiting</em> push</>}
-        lede={`${visibleStaging.length} site${visibleStaging.length === 1 ? '' : 's'} with uploaded LOI — review the draft → LOI timeline and push to the next module.`}
+      <PageHeader file="№ 04" eyebrow="Workflow · Staging" title={<>LOIs <em>awaiting</em> legal</>}
+        lede={`${visibleStaging.length} site${visibleStaging.length === 1 ? '' : 's'} with uploaded LOI — review the draft → LOI timeline and send clear sites into Legal review.`}
         right={<HeaderTag icon="check" label="ON TRACK"/>}
       />
       <StagingKpiStripSupervisor sites={visibleStaging}/>
