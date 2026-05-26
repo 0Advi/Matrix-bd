@@ -9,6 +9,7 @@ import SiteDrawer from './modules/shared/site-drawer/SiteDrawer.jsx';
 import { buildDrawerSite } from './lib/buildDrawerSite.js';
 import Icon from './modules/shared/primitives/Icon.jsx';
 import { filterByScope } from './rbac/scope.js';
+import { extractGoogleMapsCoords, looksLikeMapsUrl } from './lib/googleMaps.js';
 
 // App.jsx is now the chrome shell only.
 // Routing is handled by AppRouter / <Outlet/>.
@@ -94,7 +95,7 @@ export default function App() {
   const ME = user.name;
 
   return (
-    <div data-screen-label="01 Sites in motion" data-theme={dark ? 'dark' : 'light'} style={{
+    <div data-screen-label="01 Sites" data-theme={dark ? 'dark' : 'light'} style={{
       width: '100%', height: '100vh', display: 'flex', flexDirection: 'column',
       background: 'var(--zm-bg)', color: 'var(--zm-fg)', overflow: 'hidden',
     }}>
@@ -160,11 +161,56 @@ export function usePageContext() { return React.useContext(PageContext); }
 // NewPipelineModal — extended to capture pipeline-stage Model · SPOC · Google pin · Expected rent.
 // Same fields stay editable at shortlist (AddDetailsPage prefills from these values);
 // edits at shortlist are diff-logged into the site Activity tab.
-const PIPELINE_MODELS = ['Café · 600–900 sqft', 'Café · 900–1200 sqft', 'Café · 1200+ sqft', 'Kiosk · Express', 'Roastery + café'];
+const PIPELINE_MODELS = ['BTC Cafe', 'BTC Cafe+', 'Blue Tokai Origins', 'Roastries', 'Micro-Cafes & Express Outlets', 'Others'];
+const PIPELINE_RENT_TYPES = [
+  { id: 'revshare', label: 'Revenue share', sub: '% of monthly sales' },
+  { id: 'fixed', label: 'Fixed + escalation', sub: 'monthly fixed + % per year' },
+  { id: 'mg_revshare', label: 'MG + Revenue share', sub: 'minimum guarantee + % of sales' },
+];
 function NewPipelineModal({ onClose, onSubmit }) {
-  const [form, setForm] = useState({ name: '', visitDate: '', city: '', model: '', spocName: '', googlePin: '', rentType: '', expectedRent: '' });
+  const [form, setForm] = useState({ name: '', visitDate: '', city: '', model: '', spocName: '', googlePin: '', googleMapsUrl: '', rentType: '', expectedRent: '' });
+  const [pinStatus, setPinStatus] = useState(null); // { tone: 'info'|'ok'|'err', msg: string }
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const ready = form.name && form.visitDate && form.city && form.model && form.spocName && form.googlePin && form.rentType && form.expectedRent;
+
+  // Resolve a pasted/typed Maps URL into coords, but keep the original URL too.
+  // Both end up persisted: googlePin = "lat, lng", googleMapsUrl = the link.
+  const resolveFromUrl = async (url) => {
+    if (!url) { setPinStatus(null); return; }
+    if (!looksLikeMapsUrl(url)) { setPinStatus(null); return; }
+    setPinStatus({ tone: 'info', msg: 'Resolving Google Maps link…' });
+    const { coords, error } = await extractGoogleMapsCoords(url);
+    if (coords) {
+      setForm(prev => ({ ...prev, googlePin: coords, googleMapsUrl: url }));
+      setPinStatus({ tone: 'ok', msg: `Pin set · ${coords}` });
+    } else {
+      setForm(prev => ({ ...prev, googleMapsUrl: url }));
+      setPinStatus({ tone: 'err', msg: error || 'Could not extract coordinates from that link.' });
+    }
+  };
+  const onPinPaste = (e) => {
+    const pasted = (e.clipboardData || window.clipboardData).getData('text');
+    if (looksLikeMapsUrl(pasted)) {
+      e.preventDefault();
+      resolveFromUrl(pasted);
+    }
+  };
+  const onPinChange = (e) => {
+    const value = e.target.value;
+    if (looksLikeMapsUrl(value)) {
+      // User typed/pasted a URL into the pin field; treat it as a link, not coords.
+      setForm(prev => ({ ...prev, googleMapsUrl: value }));
+    } else {
+      setForm(prev => ({ ...prev, googlePin: value }));
+    }
+  };
+  const onPinBlur = () => {
+    if (form.googleMapsUrl && !form.googlePin) resolveFromUrl(form.googleMapsUrl);
+  };
+  const clearMapsLink = () => {
+    setForm(prev => ({ ...prev, googleMapsUrl: '' }));
+    setPinStatus(null);
+  };
   const inputBase = { height: 38, padding: '0 12px', border: '1px solid var(--zm-line)', borderRadius: 6, background: 'var(--zm-bg)', fontFamily: 'var(--zm-font-body)', fontSize: 13.5, color: 'var(--zm-fg)', outline: 'none' };
   const labelBase = { fontFamily: 'var(--zm-font-body)', fontWeight: 600, fontSize: 12, color: 'var(--zm-fg)' };
   return (
@@ -179,7 +225,7 @@ function NewPipelineModal({ onClose, onSubmit }) {
           <button onClick={onClose} className="zm-icon-btn" style={{ background: 'var(--zm-surface)', border: '1px solid var(--zm-line)', borderRadius: 8, width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--zm-fg-2)', cursor: 'pointer', flex: '0 0 30px' }}><Icon name="x" size={14}/></button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><label style={labelBase}>Site / pipeline name</label><input value={form.name} onChange={set('name')} placeholder="e.g. Powai · Lake Homes" style={inputBase}/></div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><label style={labelBase}>Site</label><input value={form.name} onChange={set('name')} placeholder="e.g. Powai · Lake Homes" style={inputBase}/></div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><label style={labelBase}>Visit date</label><input type="date" value={form.visitDate} onChange={set('visitDate')} style={{ ...inputBase, fontFamily: 'var(--zm-font-mono)', fontSize: 13 }}/></div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><label style={labelBase}>City</label><select value={form.city} onChange={set('city')} style={inputBase}><option value="">Select city…</option><option>Mumbai</option><option>Bengaluru</option><option>New Delhi</option><option>Hyderabad</option><option>Pune</option><option>Chennai</option><option>Ahmedabad</option></select></div>
@@ -188,15 +234,68 @@ function NewPipelineModal({ onClose, onSubmit }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><label style={labelBase}>Model</label><select value={form.model} onChange={set('model')} style={inputBase}><option value="">Select model…</option>{PIPELINE_MODELS.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><label style={labelBase}>SPOC name</label><input value={form.spocName} onChange={set('spocName')} placeholder="Landlord / agent" style={inputBase}/></div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><label style={labelBase}>Google pin</label><input value={form.googlePin} onChange={set('googlePin')} placeholder="19.1183, 72.9089" style={{ ...inputBase, fontFamily: 'var(--zm-font-mono)', fontSize: 13 }}/></div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><label style={labelBase}>Rent type</label><select value={form.rentType} onChange={set('rentType')} style={inputBase}><option value="">Select…</option><option value="fixed">Fixed + escalation</option><option value="revshare">Revenue share</option></select></div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><label style={labelBase}>Expected rent</label>
-              <div style={{ display: 'flex', alignItems: 'stretch', height: 38, border: '1px solid var(--zm-line)', borderRadius: 6, background: 'var(--zm-bg)', overflow: 'hidden' }}>
-                <span style={{ padding: '0 10px', display: 'flex', alignItems: 'center', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-mono)', fontSize: 12, background: 'var(--zm-surface-2)', borderRight: '1px solid var(--zm-line)' }}>₹</span>
-                <input type="number" min="0" value={form.expectedRent} onChange={set('expectedRent')} placeholder="120000" style={{ flex: 1, border: 'none', outline: 'none', padding: '0 10px', background: 'transparent', fontFamily: 'var(--zm-font-mono)', fontFeatureSettings: "'tnum' 1", fontSize: 13.5, color: 'var(--zm-fg)' }}/>
-                <span style={{ padding: '0 10px', display: 'flex', alignItems: 'center', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-mono)', fontSize: 12, background: 'var(--zm-surface-2)', borderLeft: '1px solid var(--zm-line)' }}>/mo</span>
-              </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={labelBase}>Google pin</label>
+            <input
+              value={form.googlePin || form.googleMapsUrl}
+              onChange={onPinChange}
+              onPaste={onPinPaste}
+              onBlur={onPinBlur}
+              placeholder="Paste Google Maps link or 19.1183, 72.9089"
+              style={{ ...inputBase, fontFamily: 'var(--zm-font-mono)', fontSize: 13 }}
+            />
+            {pinStatus && (
+              <span style={{
+                fontFamily: 'var(--zm-font-body)', fontSize: 11.5,
+                color: pinStatus.tone === 'ok' ? '#047857'
+                     : pinStatus.tone === 'err' ? '#B91C1C'
+                     : 'var(--zm-fg-3)',
+              }}>{pinStatus.msg}</span>
+            )}
+            {form.googleMapsUrl && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--zm-font-body)', fontSize: 11.5, color: 'var(--zm-fg-3)' }}>
+                <span>Link saved:</span>
+                <a href={form.googleMapsUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--zm-accent)', textDecoration: 'underline', maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{form.googleMapsUrl}</a>
+                <button type="button" onClick={clearMapsLink} title="Clear link" style={{ background: 'transparent', border: 'none', color: 'var(--zm-fg-3)', cursor: 'pointer', padding: 0, fontSize: 12 }}>×</button>
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={labelBase}>Rent type</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {PIPELINE_RENT_TYPES.map(rt => (
+                <button
+                  type="button"
+                  key={rt.id}
+                  onClick={() => setForm(prev => ({ ...prev, rentType: rt.id }))}
+                  className="zm-btn"
+                  style={{
+                    textAlign: 'left', padding: 12, borderRadius: 8,
+                    border: '1px solid ' + (form.rentType === rt.id ? 'var(--zm-accent)' : 'var(--zm-line)'),
+                    background: form.rentType === rt.id ? 'var(--zm-accent-soft)' : 'var(--zm-surface)',
+                    cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 10, fontFamily: 'inherit',
+                  }}
+                >
+                  <span style={{
+                    width: 16, height: 16, borderRadius: 999, marginTop: 1,
+                    border: '1.5px solid ' + (form.rentType === rt.id ? 'var(--zm-accent)' : 'var(--zm-line-strong)'),
+                    background: form.rentType === rt.id ? 'var(--zm-accent)' : 'transparent',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 16px',
+                  }}>{form.rentType === rt.id && <span style={{ width: 6, height: 6, borderRadius: 999, background: '#fff' }}/>}</span>
+                  <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <span style={{ fontFamily: 'var(--zm-font-body)', fontWeight: 600, fontSize: 12.5, color: 'var(--zm-fg)' }}>{rt.label}</span>
+                    <span style={{ fontFamily: 'var(--zm-font-body)', fontSize: 11, color: 'var(--zm-fg-3)' }}>{rt.sub}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={labelBase}>{form.rentType === 'mg_revshare' ? 'Expected MG / rent' : form.rentType === 'revshare' ? 'Expected share base' : 'Expected rent'}</label>
+            <div style={{ display: 'flex', alignItems: 'stretch', height: 38, border: '1px solid var(--zm-line)', borderRadius: 6, background: 'var(--zm-bg)', overflow: 'hidden' }}>
+              <span style={{ padding: '0 10px', display: 'flex', alignItems: 'center', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-mono)', fontSize: 12, background: 'var(--zm-surface-2)', borderRight: '1px solid var(--zm-line)' }}>₹</span>
+              <input type="number" min="0" value={form.expectedRent} onChange={set('expectedRent')} placeholder="120000" style={{ flex: 1, border: 'none', outline: 'none', padding: '0 10px', background: 'transparent', fontFamily: 'var(--zm-font-mono)', fontFeatureSettings: "'tnum' 1", fontSize: 13.5, color: 'var(--zm-fg)' }}/>
+              <span style={{ padding: '0 10px', display: 'flex', alignItems: 'center', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-mono)', fontSize: 12, background: 'var(--zm-surface-2)', borderLeft: '1px solid var(--zm-line)' }}>/mo</span>
             </div>
           </div>
         </div>

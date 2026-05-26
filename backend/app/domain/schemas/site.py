@@ -17,9 +17,10 @@ class CreateDraftRequest(BaseModel):
     # Edits to any of these post-create are diff-logged into the activity feed.
     model: Optional[str] = None
     spoc_name: Optional[str] = None
-    google_pin: Optional[str] = None
+    google_pin: Optional[str] = None  # extracted "lat, lng" string
+    google_maps_url: Optional[str] = None  # original Maps link the user pasted
     expected_rent: Optional[float] = None
-    rent_type: Optional[str] = None  # 'fixed' | 'revshare'
+    rent_type: Optional[str] = None  # 'fixed' | 'revshare' | 'mg_revshare'
 
 
 class ShortlistDraftRequest(BaseModel):
@@ -102,6 +103,7 @@ class SiteResponse(BaseModel):
     model: Optional[str] = None
     spoc_name: Optional[str] = None
     google_pin: Optional[str] = None
+    google_maps_url: Optional[str] = None
     expected_rent: Optional[float] = None
     rent_type: Optional[str] = None
 

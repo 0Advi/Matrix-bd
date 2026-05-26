@@ -53,6 +53,7 @@ async def create_draft(
         db, tenant_id=tenant_id, actor=current_user,
         name=body.name, city=body.city, visit_date=body.visit_date,
         model=body.model, spoc_name=body.spoc_name, google_pin=body.google_pin,
+        google_maps_url=body.google_maps_url,
         expected_rent=body.expected_rent, rent_type=body.rent_type,
     )
 

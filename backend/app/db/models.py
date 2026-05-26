@@ -91,6 +91,7 @@ class Site(Base):
     spoc_email: Mapped[Optional[str]] = mapped_column(Text)
     spoc_phone: Mapped[Optional[str]] = mapped_column(Text)
     google_maps_pin: Mapped[Optional[str]] = mapped_column(Text)
+    google_maps_url: Mapped[Optional[str]] = mapped_column(Text)
     expected_rent: Mapped[Optional[float]] = mapped_column(Numeric(12, 2))
     rent_type: Mapped[Optional[str]] = mapped_column(Text)
     rent_set_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
@@ -126,7 +127,7 @@ class Site(Base):
         Index("idx_sites_assigned_to", "assigned_to"),
         Index("idx_sites_supervisor_id", "supervisor_id"),
         Index("idx_sites_submitted_by", "submitted_by"),
-        CheckConstraint("rent_type IN ('fixed','revshare') OR rent_type IS NULL", name="chk_sites_rent_type"),
+        CheckConstraint("rent_type IN ('fixed','revshare','mg_revshare') OR rent_type IS NULL", name="chk_sites_rent_type"),
     )
 
 

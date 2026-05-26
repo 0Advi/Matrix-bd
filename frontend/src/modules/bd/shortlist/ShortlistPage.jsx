@@ -201,7 +201,7 @@ function ShortlistCard({ item, role, onView, onAddDetails, onApprove, onDelegate
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, padding: '10px 0', borderTop: '1px solid var(--zm-line-faint)', borderBottom: '1px solid var(--zm-line-faint)' }}>
-        {[['Est. sales', item.estSales ? `₹${(Number(item.estSales) / 100000).toFixed(1)} L/mo` : '—'], ['Carpet', item.carpet ? `${item.carpet} sqft` : '—'], ['Total op', item.totalOpCost ? `₹${Math.round(Number(item.totalOpCost) / 1000)} k/mo` : '—'], ['Rent type', item.rentType === 'fixed' ? 'Fixed + esc.' : item.rentType === 'revshare' ? 'Rev share' : '—']].map(([k, v]) => (
+        {[['Est. sales', item.estSales ? `₹${(Number(item.estSales) / 100000).toFixed(1)} L/mo` : '—'], ['Carpet', item.carpet ? `${item.carpet} sqft` : '—'], ['Total op', item.totalOpCost ? `₹${Math.round(Number(item.totalOpCost) / 1000)} k/mo` : '—'], ['Rent type', item.rentType === 'fixed' ? 'Fixed + esc.' : item.rentType === 'revshare' ? 'Rev share' : item.rentType === 'mg_revshare' ? 'MG + rev share' : '—']].map(([k, v]) => (
           <div key={k} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}><span style={{ fontFamily: 'var(--zm-font-body)', fontSize: 10.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--zm-fg-3)' }}>{k}</span><span style={{ fontFamily: 'var(--zm-font-mono)', fontFeatureSettings: "'tnum' 1", fontSize: 14, fontWeight: 600, color: 'var(--zm-fg)' }}>{v}</span></div>
         ))}
       </div>

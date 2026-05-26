@@ -94,6 +94,7 @@ def site_to_response(site: models.Site, created_by_name: str | None = None) -> S
         model=site.model,
         spoc_name=site.spoc_name,
         google_pin=site.google_maps_pin,
+        google_maps_url=site.google_maps_url,
         expected_rent=float(site.expected_rent) if site.expected_rent is not None else None,
         rent_type=site.rent_type,
     )

@@ -73,6 +73,7 @@ async def svc_create_draft(
     model: str | None = None,
     spoc_name: str | None = None,
     google_pin: str | None = None,
+    google_maps_url: str | None = None,
     expected_rent: float | None = None,
     rent_type: str | None = None,
 ) -> SiteResponse:
@@ -99,6 +100,7 @@ async def svc_create_draft(
             model=model,
             spoc_name=spoc_name,
             google_maps_pin=google_pin,
+            google_maps_url=google_maps_url,
             expected_rent=expected_rent,
             rent_type=rent_type,
             rent_set_at=now if expected_rent is not None else None,

@@ -73,6 +73,7 @@ function siteFromServer(s) {
     model: s.model,
     spocName: s.spoc_name,
     googlePin: s.google_pin,
+    googleMapsUrl: s.google_maps_url,
     expectedRent: s.expected_rent,
     rentType: s.rent_type,
   };
@@ -105,6 +106,7 @@ export async function createSite(payload) {
     model: payload.model ?? null,
     spoc_name: payload.spocName ?? null,
     google_pin: payload.googlePin ?? null,
+    google_maps_url: payload.googleMapsUrl ?? null,
     expected_rent: payload.expectedRent ?? null,
     rent_type: payload.rentType ?? null,
   };

@@ -81,7 +81,7 @@ export default function Sidebar({ counts, role, onRole }) {
       overflowY: 'auto',
     }}>
       <div style={{ ...SECTION_HEADING_STYLE, padding: '4px 10px 6px' }}>Overview</div>
-      <SidebarItem icon="trend" label="Sites in motion" active={activeView === 'overview'} onClick={() => go(ROUTES.OVERVIEW)}/>
+      <SidebarItem icon="trend" label="Sites" active={activeView === 'overview'} onClick={() => go(ROUTES.OVERVIEW)}/>
 
       {!isStubModule && (
         <>

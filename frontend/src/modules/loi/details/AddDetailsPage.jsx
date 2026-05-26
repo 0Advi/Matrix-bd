@@ -5,10 +5,11 @@ import StatusPill from '../../shared/primitives/StatusPill.jsx';
 // Render body preserved exactly from AddDetailsForm.jsx.
 // Only change: window globals replaced with ES imports above; component renamed to AddDetailsPage.
 
-const MODELS = ['Café · 600–900 sqft', 'Café · 900–1200 sqft', 'Café · 1200+ sqft', 'Kiosk · Express', 'Roastery + café'];
+const MODELS = ['BTC Cafe', 'BTC Cafe+', 'Blue Tokai Origins', 'Roastries', 'Micro-Cafes & Express Outlets', 'Others'];
 const RENT_TYPES = [
   { id: 'revshare', label: 'Revenue share', sub: '% of monthly sales' },
   { id: 'fixed', label: 'Fixed + escalation', sub: 'monthly fixed + % per year' },
+  { id: 'mg_revshare', label: 'MG + Revenue share', sub: 'minimum guarantee + % of sales' },
 ];
 
 function PhotoPicker({ photos, onAdd, onRemove }) {
@@ -83,19 +84,31 @@ export default function AddDetailsPage({ item, onClose, onSubmit, onSaveDraft })
   const upd = (k) => (v) => setF(prev => ({ ...prev, [k]: v }));
   const rentNum = parseFloat(f.rent) || 0; const camNum = parseFloat(f.cam) || 0;
   const totalOpCost = (rentNum + camNum) * 1.18;
-  const REQUIRED = ['model','spocName','googlePin','score','estSales','nearestStarbucks','nearestTWC','carpet','cam','rentType','rent','cadex','deposit','brokerage'];
+  const REQUIRED = ['model','spocName','googlePin','score','estSales','nearestStarbucks','nearestTWC','carpet','cam','rentType','cadex','deposit','brokerage'];
   const errors = {};
   REQUIRED.forEach(k => { if (!f[k] && f[k] !== 0) errors[k] = 'Required'; });
   if (f.photos.length === 0) errors.photos = 'Add at least one photo';
-  if (f.rentType === 'fixed' && !f.escalation) errors.escalation = 'Set escalation %';
+  if (f.rentType === 'fixed') {
+    if (!f.rent) errors.rent = 'Required';
+    if (!f.escalation) errors.escalation = 'Set escalation %';
+  }
   if (f.rentType === 'revshare' && !f.revshare) errors.revshare = 'Set revenue share %';
+  if (f.rentType === 'mg_revshare') {
+    if (!f.rent) errors.rent = 'Set minimum guarantee';
+    if (!f.revshare) errors.revshare = 'Set revenue share %';
+  }
   const filled = Object.keys(errors).length === 0;
-  // The conditional rent field (escalation OR revshare) counts as one essential
+  // The conditional rent fields (rent/escalation/revshare) count as essentials
   // once a rent type is picked. Photos block is one essential. Anything else is
   // bonus / nice-to-have so it never lands in the headline count.
-  const conditionalRentKey = f.rentType === 'fixed' ? 'escalation' : f.rentType === 'revshare' ? 'revshare' : null;
-  const totalFields = REQUIRED.length + 1 + (conditionalRentKey ? 1 : 0);
-  const conditionalFilled = conditionalRentKey ? (f[conditionalRentKey] ? 1 : 0) : 0;
+  const RENT_EXTRAS = {
+    fixed: ['rent', 'escalation'],
+    revshare: ['revshare'],
+    mg_revshare: ['rent', 'revshare'],
+  };
+  const rentExtras = RENT_EXTRAS[f.rentType] || [];
+  const totalFields = REQUIRED.length + 1 + rentExtras.length;
+  const conditionalFilled = rentExtras.filter(k => f[k]).length;
   const filledCount =
     REQUIRED.filter(k => f[k] || f[k] === 0).length
     + (f.photos.length > 0 ? 1 : 0)
@@ -125,10 +138,11 @@ export default function AddDetailsPage({ item, onClose, onSubmit, onSaveDraft })
             <FormSection n="12·14" title="Carpet · CAM · rent">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}><TextField label="Carpet / covered area" value={f.carpet} onChange={upd('carpet')} required mono suffix="sqft" placeholder="e.g. 850"/><TextField label="CAM" value={f.cam} onChange={upd('cam')} required mono prefix="₹" suffix="/mo" placeholder="e.g. 25000" hint="Full rupees · no commas"/><div/></div>
               <div style={{ background: 'var(--zm-surface)', border: '1px solid var(--zm-line)', borderRadius: 10, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div><label style={{ display: 'block', fontFamily: 'var(--zm-font-body)', fontWeight: 600, fontSize: 12, color: 'var(--zm-fg)', marginBottom: 8 }}>Rent type <span style={{ color: '#B91C1C', fontWeight: 700 }}>*</span></label><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>{RENT_TYPES.map(rt => (<button key={rt.id} onClick={() => upd('rentType')(rt.id)} className="zm-btn" style={{ textAlign: 'left', padding: 12, borderRadius: 8, border: '1px solid ' + (f.rentType === rt.id ? 'var(--zm-accent)' : 'var(--zm-line)'), background: f.rentType === rt.id ? 'var(--zm-accent-soft)' : 'var(--zm-surface)', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 10, fontFamily: 'inherit' }}><span style={{ width: 16, height: 16, borderRadius: 999, marginTop: 1, border: '1.5px solid ' + (f.rentType === rt.id ? 'var(--zm-accent)' : 'var(--zm-line-strong)'), background: f.rentType === rt.id ? 'var(--zm-accent)' : 'transparent', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 16px' }}>{f.rentType === rt.id && <span style={{ width: 6, height: 6, borderRadius: 999, background: '#fff' }}/>}</span><span style={{ display: 'flex', flexDirection: 'column' }}><span style={{ fontFamily: 'var(--zm-font-body)', fontWeight: 600, fontSize: 13, color: 'var(--zm-fg)' }}>{rt.label}</span><span style={{ fontFamily: 'var(--zm-font-body)', fontSize: 11.5, color: 'var(--zm-fg-3)' }}>{rt.sub}</span></span></button>))}</div></div>
+                <div><label style={{ display: 'block', fontFamily: 'var(--zm-font-body)', fontWeight: 600, fontSize: 12, color: 'var(--zm-fg)', marginBottom: 8 }}>Rent type <span style={{ color: '#B91C1C', fontWeight: 700 }}>*</span></label><div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>{RENT_TYPES.map(rt => (<button type="button" key={rt.id} onClick={() => upd('rentType')(rt.id)} className="zm-btn" style={{ textAlign: 'left', padding: 12, borderRadius: 8, border: '1px solid ' + (f.rentType === rt.id ? 'var(--zm-accent)' : 'var(--zm-line)'), background: f.rentType === rt.id ? 'var(--zm-accent-soft)' : 'var(--zm-surface)', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 10, fontFamily: 'inherit' }}><span style={{ width: 16, height: 16, borderRadius: 999, marginTop: 1, border: '1.5px solid ' + (f.rentType === rt.id ? 'var(--zm-accent)' : 'var(--zm-line-strong)'), background: f.rentType === rt.id ? 'var(--zm-accent)' : 'transparent', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 16px' }}>{f.rentType === rt.id && <span style={{ width: 6, height: 6, borderRadius: 999, background: '#fff' }}/>}</span><span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}><span style={{ fontFamily: 'var(--zm-font-body)', fontWeight: 600, fontSize: 12.5, color: 'var(--zm-fg)' }}>{rt.label}</span><span style={{ fontFamily: 'var(--zm-font-body)', fontSize: 11, color: 'var(--zm-fg-3)' }}>{rt.sub}</span></span></button>))}</div></div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-                  {f.rentType === 'fixed' && (<><TextField label="Rent (monthly)" value={f.rent} onChange={upd('rent')} required mono prefix="₹" suffix="/mo" placeholder="e.g. 180000" hint="Full rupees · no commas"/><TextField label="Escalation" value={f.escalation} onChange={upd('escalation')} required mono suffix="% / yr" placeholder="e.g. 5"/><TextField label="Rent-free days" value={f.rentFreeDays} onChange={upd('rentFreeDays')} mono suffix="days" hint="Optional fit-out grace"/></>)}
-                  {f.rentType === 'revshare' && (<><TextField label="Revenue share" value={f.revshare} onChange={upd('revshare')} required mono suffix="% of sales" placeholder="e.g. 12" error={errors.revshare}/><TextField label="Min guarantee" value={f.rent} onChange={upd('rent')} mono prefix="₹" suffix="/mo" placeholder="e.g. 80000" hint="Full rupees · if applicable" required/><TextField label="Rent-free days" value={f.rentFreeDays} onChange={upd('rentFreeDays')} mono suffix="days" hint="Optional"/></>)}
+                  {f.rentType === 'fixed' && (<><TextField label="Rent (monthly)" value={f.rent} onChange={upd('rent')} required mono prefix="₹" suffix="/mo" placeholder="e.g. 180000" hint="Full rupees · no commas" error={errors.rent}/><TextField label="Escalation" value={f.escalation} onChange={upd('escalation')} required mono suffix="% / yr" placeholder="e.g. 5" error={errors.escalation}/><TextField label="Rent-free days" value={f.rentFreeDays} onChange={upd('rentFreeDays')} mono suffix="days" hint="Optional fit-out grace"/></>)}
+                  {f.rentType === 'revshare' && (<><TextField label="Revenue share" value={f.revshare} onChange={upd('revshare')} required mono suffix="% of sales" placeholder="e.g. 12" error={errors.revshare}/><TextField label="Rent-free days" value={f.rentFreeDays} onChange={upd('rentFreeDays')} mono suffix="days" hint="Optional"/><div/></>)}
+                  {f.rentType === 'mg_revshare' && (<><TextField label="Minimum guarantee" value={f.rent} onChange={upd('rent')} required mono prefix="₹" suffix="/mo" placeholder="e.g. 80000" hint="MG floor · full rupees" error={errors.rent}/><TextField label="Revenue share" value={f.revshare} onChange={upd('revshare')} required mono suffix="% of sales" placeholder="e.g. 12" hint="Above MG threshold" error={errors.revshare}/><TextField label="Rent-free days" value={f.rentFreeDays} onChange={upd('rentFreeDays')} mono suffix="days" hint="Optional"/></>)}
                   {!f.rentType && (<div style={{ gridColumn: 'span 3', padding: 16, background: 'var(--zm-surface-2)', borderRadius: 8, fontFamily: 'var(--zm-font-body)', fontSize: 12.5, color: 'var(--zm-fg-3)', textAlign: 'center' }}>Pick a rent type above to reveal the rent fields.</div>)}
                 </div>
               </div>

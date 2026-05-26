@@ -247,6 +247,7 @@ export function SitesProvider({ children }) {
       model: form.model || null,
       spocName: form.spocName || null,
       googlePin: form.googlePin || null,
+      googleMapsUrl: form.googleMapsUrl || null,
       rentType: form.rentType || null,
       expectedRent: form.expectedRent ? Number(form.expectedRent) : null,
       createdBy: { id: session?.id || session?.sub || undefined, name: sessionDisplayName },

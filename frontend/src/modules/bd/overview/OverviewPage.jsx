@@ -81,7 +81,7 @@ function MetricStrip({ metrics }) {
   const m = metrics || { inMotion: { value: 0, sub: 'no data' }, drafts: { value: 0, sub: 'no data' }, shortlist: { value: 0, sub: 'no data' }, loi: { value: 0, sub: 'no data' } };
   return (
     <div className="zm-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-      <MetricCard no="Ⅰ" eyebrow="Sites in motion"    value={m.inMotion.value}  rule="var(--zm-accent)"  delta={m.inMotion.delta}  sub={m.inMotion.sub}/>
+      <MetricCard no="Ⅰ" eyebrow="Sites"              value={m.inMotion.value}  rule="var(--zm-accent)"  delta={m.inMotion.delta}  sub={m.inMotion.sub}/>
       <MetricCard no="Ⅱ" eyebrow="New drafts"         value={m.drafts.value}    rule="var(--zm-fg-3)"    delta={m.drafts.delta}    sub={m.drafts.sub}/>
       <MetricCard no="Ⅲ" eyebrow="Shortlist"          value={m.shortlist.value} rule="var(--zm-info)"    delta={m.shortlist.delta} sub={m.shortlist.sub}/>
       <MetricCard no="Ⅳ" eyebrow="LOI due / overdue"  value={m.loi.value}       rule="var(--zm-copper)"  delta={m.loi.delta} deltaTone={m.loi.deltaTone || 'neutral'} sub={m.loi.sub}/>
@@ -291,7 +291,7 @@ export default function OverviewPage({ onOpenSite: onOpenSiteProp }) {
   return (
     <>
       <PageHeader
-        file="№ 01" eyebrow="Overview" title="Sites in motion"
+        file="№ 01" eyebrow="Overview" title="Sites"
         lede={role === 'supervisor'
           ? `Synced 2 min ago — all sites in your tenant. ${totalMotion} files across draft, shortlist and staging.`
           : `Synced 2 min ago — your sites, ${ME}. ${totalMotion} files across draft, shortlist and staging.`}
