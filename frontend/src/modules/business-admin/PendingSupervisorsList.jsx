@@ -56,34 +56,34 @@ export default function PendingSupervisorsList() {
 
   return (
     <div>
-      <div style={{ display: 'inline-flex', gap: 4, padding: 4, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, marginBottom: 14 }}>
+      <div style={{ display: 'inline-flex', gap: 4, padding: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 999, marginBottom: 14 }}>
         {FILTERS.map(({ key, label }) => (
-          <button key={key} onClick={() => setFilter(key)} style={{ height: 28, padding: '0 14px', borderRadius: 999, border: 'none', background: filter === key ? '#fff' : 'transparent', color: filter === key ? '#0B0C10' : 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{label}</button>
+          <button key={key} onClick={() => setFilter(key)} style={{ height: 28, padding: '0 14px', borderRadius: 999, border: 'none', background: filter === key ? '#fff' : 'transparent', color: filter === key ? '#0B0C10' : 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{label}</button>
         ))}
       </div>
 
-      {error && <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(220,38,38,0.18)', color: '#FCA5A5', marginBottom: 14, fontSize: 13 }}>{error}</div>}
+      {error && <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(220,38,38,0.22)', color: '#FCA5A5', marginBottom: 14, fontSize: 13, border: '1px solid rgba(220,38,38,0.35)' }}>{error}</div>}
 
-      {items === null && !error && <div style={{ opacity: 0.6, fontSize: 13 }}>Loading…</div>}
+      {items === null && !error && <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>Loading…</div>}
 
       {items && items.length === 0 && (
-        <div style={{ padding: 40, textAlign: 'center', border: '1px dashed rgba(255,255,255,0.15)', borderRadius: 14, color: 'rgba(255,255,255,0.55)', fontSize: 13 }}>
+        <div style={{ padding: 40, textAlign: 'center', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: 14, color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>
           No pending supervisors{filter === 'all' ? '' : ` for ${filter}`}.
         </div>
       )}
 
       {items && items.length > 0 && (
-        <div className="zm-glass" style={{ borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ borderRadius: 12, overflow: 'hidden', background: '#13141B', border: '1px solid rgba(255,255,255,0.12)' }}>
           {items.map((u, i) => {
             const isBusy = busyUserId === u.id;
             return (
-              <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1.6fr 0.7fr 1fr 200px', gap: 12, padding: '14px 18px', borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.06)', alignItems: 'center', fontSize: 13 }}>
-                <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12.5, color: 'rgba(255,255,255,0.9)' }}>{u.email}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.7 }}>{u.module}</span>
-                <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.55)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{u.createdAt ? new Date(u.createdAt).toLocaleString() : '—'}</span>
+              <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1.6fr 0.7fr 1fr 200px', gap: 12, padding: '14px 18px', borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.08)', alignItems: 'center', fontSize: 13 }}>
+                <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12.5, color: '#fff' }}>{u.email}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)' }}>{u.module}</span>
+                <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.7)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{u.createdAt ? new Date(u.createdAt).toLocaleString() : '—'}</span>
                 <span style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <button onClick={() => onReject(u)} disabled={isBusy} style={{ height: 30, padding: '0 12px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.18)', background: 'transparent', color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: 600, cursor: isBusy ? 'wait' : 'pointer' }}>Reject</button>
-                  <button onClick={() => onApprove(u)} disabled={isBusy} className="zm-btn zm-btn-primary" style={{ height: 30, padding: '0 14px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: isBusy ? 'wait' : 'pointer' }}>{isBusy ? 'Working…' : 'Approve'}</button>
+                  <button onClick={() => onReject(u)} disabled={isBusy} style={{ height: 30, padding: '0 12px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: isBusy ? 'wait' : 'pointer' }}>Reject</button>
+                  <button onClick={() => onApprove(u)} disabled={isBusy} style={{ height: 30, padding: '0 14px', borderRadius: 7, border: 'none', background: '#fff', color: '#0B0C10', fontSize: 12, fontWeight: 700, cursor: isBusy ? 'wait' : 'pointer' }}>{isBusy ? 'Working…' : 'Approve'}</button>
                 </span>
               </div>
             );
