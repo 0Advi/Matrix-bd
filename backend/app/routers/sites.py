@@ -202,6 +202,16 @@ async def patch_site_status(
                 detail="Only the supervisor can push a site to Payments.",
             )
         return await svc_push_to_payments(db, tenant_id=tenant_id, actor=current_user, site_id=site_id)
+    if new_status == SiteStatus.LEGAL_REVIEW:
+        # BD supervisor hand-off: LOI_UPLOADED → LEGAL_REVIEW. svc_push_to_payments
+        # is the renamed handler that actually performs this transition + seeds
+        # the legal DD checklist + notifies legal supervisors.
+        if (current_user.get("role") or "").lower() != "supervisor":
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="Only the supervisor can send a site to Legal review.",
+            )
+        return await svc_push_to_payments(db, tenant_id=tenant_id, actor=current_user, site_id=site_id)
     if new_status == SiteStatus.LOI_UPLOADED:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
