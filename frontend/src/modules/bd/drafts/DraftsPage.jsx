@@ -173,7 +173,7 @@ export default function DraftsPage({ onOpenSite: onOpenSiteProp, showToast: show
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <PageHeader
         file="№ 02" eyebrow="Workflow · Pipeline"
-        title={role === 'supervisor' ? <>Drafts <em>awaiting</em> shortlist</> : <>Your drafts <em>in flight</em></>}
+        title={<>Drafts</>}
         lede={
           role === 'supervisor'
             ? `${visibleDrafts.length} draft${visibleDrafts.length === 1 ? '' : 's'} from all your BD execs. Supervisor SLA: 7 days. Tap Yes, No, or Archive.`

@@ -5,7 +5,9 @@ import { useSession } from '../../../state/SessionContext.jsx';
 
 // Render body preserved exactly from Chrome.jsx TopBar component.
 export default function TopBar({ user, role, dark, onToggleDark, onNewPipeline, onSearch }) {
-  const { signOut } = useSession();
+  const { signOut, session } = useSession();
+  // BD-only action — legal and payment supervisors don't open pipeline drafts.
+  const showNewPipeline = session?.module !== 'legal' && session?.module !== 'payment';
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -120,17 +122,19 @@ export default function TopBar({ user, role, dark, onToggleDark, onNewPipeline, 
           )}
         </button>
 
-        <button onClick={onNewPipeline} className="zm-tb-cta" style={{
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          height: 34, padding: '0 14px', borderRadius: 8,
-          background: 'var(--zm-accent)', color: '#fff', border: 'none',
-          fontFamily: 'var(--zm-font-body)', fontSize: 12.5, fontWeight: 600,
-          cursor: 'pointer', boxShadow: 'var(--zm-shadow-1)',
-          whiteSpace: 'nowrap', lineHeight: 1, flex: '0 0 auto',
-        }}>
-          <Icon name="plus" size={13}/>
-          <span>New pipeline</span>
-        </button>
+        {showNewPipeline && (
+          <button onClick={onNewPipeline} className="zm-tb-cta" style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            height: 34, padding: '0 14px', borderRadius: 8,
+            background: 'var(--zm-accent)', color: '#fff', border: 'none',
+            fontFamily: 'var(--zm-font-body)', fontSize: 12.5, fontWeight: 600,
+            cursor: 'pointer', boxShadow: 'var(--zm-shadow-1)',
+            whiteSpace: 'nowrap', lineHeight: 1, flex: '0 0 auto',
+          }}>
+            <Icon name="plus" size={13}/>
+            <span>New pipeline</span>
+          </button>
+        )}
 
         <span style={{ width: 1, height: 24, background: 'var(--zm-line)', marginLeft: 2, flex: '0 0 auto' }}/>
 

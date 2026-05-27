@@ -262,7 +262,7 @@ export default function ShortlistPage({ onOpenSite: onOpenSiteProp, showToast: s
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 920 }}>
       <PageHeader
         file="№ 03" eyebrow="Workflow · Shortlist"
-        title={<>Shortlist <em>queue</em></>}
+        title={<>Shortlist</>}
         lede={role === 'supervisor'
           ? `${visibleShortlist.length} site${visibleShortlist.length === 1 ? '' : 's'} cleared from pipeline — approve once the exec marks them as in review.`
           : `${visibleShortlist.length} of your own shortlisted site${visibleShortlist.length === 1 ? '' : 's'} — add the 17 essential fields, then send for review.`}
