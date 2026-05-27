@@ -145,15 +145,6 @@ export default function DdrPage() {
     return () => { cancelled = true; };
   }, [siteId]);
 
-  React.useEffect(() => {
-    if (!siteId) return;
-    let cancelled = false;
-    listSiteDelegations(siteId)
-      .then((items) => { if (!cancelled) setDelegations(items || []); })
-      .catch(() => { if (!cancelled) setDelegations([]); });
-    return () => { cancelled = true; };
-  }, [siteId]);
-
   if (!siteId) {
     return <div className="zm-glass" style={{ padding: 24, margin: 24, color: 'var(--zm-danger)' }}>Missing site id.</div>;
   }
