@@ -27,18 +27,43 @@ export async function submitDetails(siteId, formData, by) {
     const n = Number(String(v).replace(/[,\s₹]/g, ''));
     return Number.isFinite(n) ? n : undefined;
   };
+  // Coerce every numeric field in the form payload before sending. Without
+  // this, the backend's status-patch dispatcher (which reads payload.details
+  // as a raw dict and skips Pydantic) ends up writing string values straight
+  // into NUMERIC columns — which silently fails for some optional-field
+  // shapes (cadex/deposit/brokerage/escalation/revshare) and surfaces as
+  // "details not getting submitted" once any optional field is filled in.
+  const coercedDetails = {
+    ...formData,
+    score:            toNumber(formData.score),
+    estSales:         toNumber(formData.estSales),
+    nearestStarbucks: toNumber(formData.nearestStarbucks),
+    nearestTWC:       toNumber(formData.nearestTWC),
+    carpet:           toNumber(formData.carpet),
+    cam:              toNumber(formData.cam),
+    rent:             toNumber(formData.rent),
+    escalation:       toNumber(formData.escalation),
+    revshare:         toNumber(formData.revshare),
+    rentFreeDays:     toNumber(formData.rentFreeDays),
+    cadex:            toNumber(formData.cadex),
+    deposit:          toNumber(formData.deposit),
+    brokerage:        toNumber(formData.brokerage),
+    lockin:           toNumber(formData.lockin),
+    tenure:           toNumber(formData.tenure),
+    totalOpCost:      toNumber(formData.totalOpCost),
+  };
   return transitionSite(siteId, SiteStatus.DETAILS_SUBMITTED, {
     by,
-    details: formData,
-    score:        toNumber(formData.score),
-    estSales:     toNumber(formData.estSales),
-    carpet:       toNumber(formData.carpet),
-    rent:         toNumber(formData.rent),
+    details: coercedDetails,
+    score:        coercedDetails.score,
+    estSales:     coercedDetails.estSales,
+    carpet:       coercedDetails.carpet,
+    rent:         coercedDetails.rent,
     rentType:     formData.rentType,
-    totalOpCost:  toNumber(formData.totalOpCost),
-    lockin:       toNumber(formData.lockin),
-    tenure:       toNumber(formData.tenure),
-    rentFreeDays: toNumber(formData.rentFreeDays),
+    totalOpCost:  coercedDetails.totalOpCost,
+    lockin:       coercedDetails.lockin,
+    tenure:       coercedDetails.tenure,
+    rentFreeDays: coercedDetails.rentFreeDays,
   });
 }
 
@@ -105,9 +130,32 @@ export async function assignSite(siteId, execId) {
   return adapter.assignSite(siteId, execId);
 }
 
-// Save partial details (stays in current status, does not transition)
+// Save partial details (stays in current status, does not transition).
+// Coerce every numeric field on the way out so the backend's site_details
+// upsert writes proper NUMERIC values instead of strings — without this,
+// some columns (cadex/deposit/brokerage/lockin/tenure/escalation/revshare)
+// would round-trip back to the UI as empty after a draft save, because the
+// FE→BE string write only succeeds opportunistically depending on column
+// type and PG version.
 export async function saveDraftDetails(siteId, formData) {
-  return adapter.patchSiteDetails(siteId, { ...formData, _savedAt: new Date().toISOString() });
+  const toNumber = (v) => {
+    if (v === null || v === undefined || v === '') return undefined;
+    const n = Number(String(v).replace(/[,\s₹]/g, ''));
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const NUMERIC_FIELDS = [
+    'score', 'estSales', 'nearestStarbucks', 'nearestTWC',
+    'carpet', 'cam', 'rent', 'escalation', 'revshare',
+    'rentFreeDays', 'cadex', 'deposit', 'brokerage',
+    'lockin', 'tenure', 'totalOpCost',
+  ];
+  const coerced = { ...formData };
+  for (const key of NUMERIC_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(coerced, key)) {
+      coerced[key] = toNumber(coerced[key]);
+    }
+  }
+  return adapter.patchSiteDetails(siteId, { ...coerced, _savedAt: new Date().toISOString() });
 }
 
 // ── Shortlist delegations ──────────────────────────────────────────────────
