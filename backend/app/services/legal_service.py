@@ -54,14 +54,20 @@ logger = logging.getLogger(__name__)
 
 # DD fields used for the auto-positive check in svc_save_verification.
 # Core fields — all 7 must be 'yes' for auto-positive to fire.
-# Optional slots (other_1 / other_2) are free-form additions; a NULL value
-# means "not used on this site" and must NOT block the positive verdict.
-# If a supervisor has filled them in they must also be 'yes'.
+# Optional slots (other_1 / other_2) are free-form additions whose values are
+# NEVER NULL in the DB (schema is NOT NULL DEFAULT 'pending'). They must NOT
+# block the positive verdict in their default 'pending' state — that's the
+# "not used on this site" signal. If a supervisor has actively engaged them
+# they must mark them 'yes'; any 'no' blocks auto-positive. NULL is kept in
+# the allow-list as a defensive guard in case the schema is ever loosened.
 _CORE_DD_FIELDS = (
     "title_doc", "sanctioned_plan", "oc_cc", "commercial_use",
     "property_tax", "electricity", "fire_noc",
 )
 _OPTIONAL_DD_FIELDS = ("other_1", "other_2")
+# Values in the optional slots that do NOT block auto-positive recovery.
+# 'pending' is the schema default — see _OPTIONAL_DD_FIELDS comment above.
+_OPTIONAL_DD_NON_BLOCKING = (None, "pending", "yes")
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -395,9 +401,12 @@ async def svc_save_verification(
 
         # ── Auto-positive check with LEGAL_REJECTED recovery ─────────────────
         # After every supervisor edit, check if all required DD items are 'yes'.
-        # Rule: 7 core items must be 'yes'; other_1/other_2 must be 'yes' OR NULL
-        # (NULL = "not used on this site"; a supervisor who adds them must also
-        # mark them yes before positive triggers).
+        # Rule: 7 core items must be 'yes'; other_1/other_2 must be in
+        # _OPTIONAL_DD_NON_BLOCKING (None, 'pending', 'yes') — i.e. not 'no'.
+        # The schema defaults other_1/other_2 to 'pending', so a supervisor who
+        # never touches those fields still gets auto-positive once the 7 core
+        # items are green (matches the original PR #29 intent — see the
+        # _OPTIONAL_DD_FIELDS docstring).
         # If the bar is met:
         #   1. final_verdict → 'positive', legal_dd_status → 'positive'
         #   2. If site was LEGAL_REJECTED, transition back to LEGAL_REVIEW so
@@ -410,7 +419,7 @@ async def svc_save_verification(
         if dd.final_verdict != "positive":
             all_required_yes = (
                 all(getattr(dd, f) == "yes" for f in _CORE_DD_FIELDS)
-                and all(getattr(dd, f) in (None, "yes") for f in _OPTIONAL_DD_FIELDS)
+                and all(getattr(dd, f) in _OPTIONAL_DD_NON_BLOCKING for f in _OPTIONAL_DD_FIELDS)
             )
             if all_required_yes:
                 dd.final_verdict = "positive"

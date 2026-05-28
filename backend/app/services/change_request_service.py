@@ -44,8 +44,12 @@ _CORE_DD_FIELDS = {
     "title_doc", "sanctioned_plan", "oc_cc", "commercial_use",
     "property_tax", "electricity", "fire_noc",
 }
-# other_1/other_2 are optional free-form slots; NULL means "not used".
+# other_1/other_2 are optional free-form slots. Schema NOT NULL DEFAULT 'pending'
+# so the values are NEVER NULL in practice; 'pending' is the "not used" signal
+# and must NOT block recovery. Only an active 'no' blocks the positive flip.
+# NULL stays in the allow-list as a defensive guard against schema loosening.
 _OPTIONAL_DD_FIELDS = {"other_1", "other_2"}
+_OPTIONAL_DD_NON_BLOCKING = {None, "pending", "yes"}
 # Full set used by _allowed_field to gate what fields a change-request may touch.
 _DD_FIELDS = _CORE_DD_FIELDS | _OPTIONAL_DD_FIELDS
 _LICENSING_FIELDS = {
@@ -266,10 +270,12 @@ async def _maybe_recover_dd_verdict(
         return
 
     # Core fields must all be 'yes'; optional slots (other_1/other_2) must be
-    # 'yes' OR NULL (NULL = not used on this site, doesn't block recovery).
+    # in _OPTIONAL_DD_NON_BLOCKING — i.e. None / 'pending' (schema default) /
+    # 'yes'. An active 'no' on either blocks recovery. See the docstring on
+    # _OPTIONAL_DD_FIELDS above for why 'pending' is non-blocking.
     if not (
         all(getattr(dd, col) == "yes" for col in _CORE_DD_FIELDS)
-        and all(getattr(dd, col) in (None, "yes") for col in _OPTIONAL_DD_FIELDS)
+        and all(getattr(dd, col) in _OPTIONAL_DD_NON_BLOCKING for col in _OPTIONAL_DD_FIELDS)
     ):
         return
 
