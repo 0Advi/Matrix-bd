@@ -39,6 +39,7 @@
   --zm-accent-press:  #093C3B;
   --zm-accent-soft:   #E5EEED;
   --zm-accent-line:   #9CC1C0;
+  --zm-accent-on:     #FFFFFF;   /* foreground on accent surface */
 
   /* Data highlight — Burnished Copper */
   --zm-copper:        #B0712E;
@@ -138,6 +139,7 @@
   --zm-accent-press:  #2EB5A6;
   --zm-accent-soft:   rgba(77,208,193,0.12);
   --zm-accent-line:   rgba(77,208,193,0.32);
+  --zm-accent-on:     #0B0B12;   /* dark ink on mint accent */
 
   --zm-copper:        #E0A659;
   --zm-copper-hover:  #ECBA77;
