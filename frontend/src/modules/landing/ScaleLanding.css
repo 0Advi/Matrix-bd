@@ -54,10 +54,17 @@ body[data-accent="copper"] { --scale-accent: #E0A659; --scale-accent-2: #C28840;
 body[data-accent="plum"]   { --scale-accent: #B197D2; --scale-accent-2: #8A2BE2; --scale-accent-soft: rgba(177,151,210,0.18); --scale-glow: rgba(138,43,226,0.5); }
 
 /* Override index.html's `html, body, #root { height:100%; overflow:hidden }`
-   so the 900vh sticky-stage scroll model actually scrolls. */
+   so the 900vh sticky-stage scroll model actually scrolls. Use
+   overflow:visible on html/#root and overflow-y:auto only on body — that
+   way there is ONE scroll container (body→window), window.scroll fires,
+   and position:sticky on .stage pins against the right ancestor. */
 html[data-scale-route="true"],
-body[data-scale-route="true"],
 body[data-scale-route="true"] #root {
+  height: auto !important;
+  min-height: 100%;
+  overflow: visible !important;
+}
+body[data-scale-route="true"] {
   height: auto !important;
   min-height: 100%;
   overflow-x: hidden !important;
