@@ -143,13 +143,12 @@
   --zm-accent-press:  #2EB5A6;
   --zm-accent-soft:   rgba(77,208,193,0.12);
   --zm-accent-line:   rgba(77,208,193,0.32);
-  /* CTA buttons in dark stay deep teal (matches the light-mode CTA weight)
-     so they don't look like a pastel chip on the ink background. The mint
-     --zm-accent still drives text/highlights/icons where pop is wanted. */
-  --zm-cta-bg:        #0F5D5C;
-  --zm-cta-bg-hover:  #14716F;
-  --zm-cta-fg:        #FFFFFF;
   --zm-accent-on:     #0B0B12;   /* dark ink on mint accent surfaces */
+  /* CTA: keep dark mode's own identity — mint surface + dark ink text.
+     ~10.5:1 contrast, distinctly "dark theme" (no copy of the light CTA). */
+  --zm-cta-bg:        #4DD0C1;
+  --zm-cta-bg-hover:  #6FDDD0;
+  --zm-cta-fg:        #0B0B12;
 
   --zm-copper:        #E0A659;
   --zm-copper-hover:  #ECBA77;
