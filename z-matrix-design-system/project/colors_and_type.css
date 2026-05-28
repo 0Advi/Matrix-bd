@@ -40,6 +40,10 @@
   --zm-accent-soft:   #E5EEED;
   --zm-accent-line:   #9CC1C0;
   --zm-accent-on:     #FFFFFF;   /* foreground on accent surface */
+  /* CTA button tokens — light mode mirrors --zm-accent. */
+  --zm-cta-bg:        #0F5D5C;
+  --zm-cta-bg-hover:  #0C4B4A;
+  --zm-cta-fg:        #FFFFFF;
 
   /* Data highlight — Burnished Copper */
   --zm-copper:        #B0712E;
@@ -139,7 +143,13 @@
   --zm-accent-press:  #2EB5A6;
   --zm-accent-soft:   rgba(77,208,193,0.12);
   --zm-accent-line:   rgba(77,208,193,0.32);
-  --zm-accent-on:     #0B0B12;   /* dark ink on mint accent */
+  /* CTA buttons in dark stay deep teal (matches the light-mode CTA weight)
+     so they don't look like a pastel chip on the ink background. The mint
+     --zm-accent still drives text/highlights/icons where pop is wanted. */
+  --zm-cta-bg:        #0F5D5C;
+  --zm-cta-bg-hover:  #14716F;
+  --zm-cta-fg:        #FFFFFF;
+  --zm-accent-on:     #0B0B12;   /* dark ink on mint accent surfaces */
 
   --zm-copper:        #E0A659;
   --zm-copper-hover:  #ECBA77;
