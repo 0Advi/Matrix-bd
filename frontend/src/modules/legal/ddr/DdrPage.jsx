@@ -563,7 +563,13 @@ export default function DdrPage() {
       saving={saving}
       submitting={submitting}
       stage={stage}
-      onSubmitForReview={role === 'executive' ? handleSubmitForReview : undefined}
+      // isExecutive accepts both 'executive' (backend ships this) and 'exec'
+      // (mock-mode role switcher, plus any legacy session payload). Using the
+      // narrower role==='executive' check here previously hid the
+      // Submit-for-review button whenever a session carried role='exec',
+      // making the draft → pending_review flow unreachable from the UI even
+      // though svc_submit_dd_for_review accepted it server-side.
+      onSubmitForReview={isExecutive ? handleSubmitForReview : undefined}
       submittingForReview={submittingForReview}
     />
     </>
