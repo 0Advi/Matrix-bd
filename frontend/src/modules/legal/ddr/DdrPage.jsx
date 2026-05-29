@@ -154,9 +154,34 @@ export default function DdrPage() {
         if (cancelled) return;
         setError(err?.detail || err?.message || 'Failed to load DDR');
         setLoadState('error');
-      });
+    });
     return () => { cancelled = true; };
   }, [siteId]);
+
+  const dd = review?.dd;
+  const initialCore = React.useMemo(
+    () => coreFromDd(dd),
+    [
+      siteId,
+      dd?.title_doc,
+      dd?.sanctioned_plan,
+      dd?.oc_cc,
+      dd?.commercial_use,
+      dd?.property_tax,
+      dd?.electricity,
+      dd?.fire_noc,
+    ],
+  );
+  const initialOthers = React.useMemo(
+    () => otherRowsFromDd(dd),
+    [
+      siteId,
+      dd?.other_1,
+      dd?.other_1_label,
+      dd?.other_2,
+      dd?.other_2_label,
+    ],
+  );
 
   if (!siteId) {
     return <div className="zm-glass" style={{ padding: 24, margin: 24, color: 'var(--zm-danger)' }}>Missing site id.</div>;
@@ -179,9 +204,12 @@ export default function DdrPage() {
     );
   }
 
-  const initialCore = coreFromDd(review?.dd);
-  const initialOthers = otherRowsFromDd(review?.dd);
-  const stage = review?.dd?.stage || 'draft';
+  const rawStage = review?.dd?.stage || 'draft';
+  const ddFinalVerdict = review?.dd?.final_verdict || 'pending';
+  const ddFinalized = ddFinalVerdict !== 'pending' && Boolean(review?.dd?.approved_by);
+  const publishedButUnfinalized = rawStage === 'published' && !ddFinalized;
+  const stage = publishedButUnfinalized ? 'draft' : rawStage;
+  const displayLegalDdStatus = publishedButUnfinalized ? 'in_review' : (review?.legalDdStatus || 'pending');
   // Executive must hold an active legal delegation on this site to edit. The
   // backend enforces this (raises 403 in svc_save_verification), so we mirror
   // it here to avoid letting an executive type into a checklist that the API
@@ -327,11 +355,10 @@ export default function DdrPage() {
   //   && dd.final_verdict === 'positive'
   //   && there is an active legal delegation on this site for me.
   //
-  // Defensive default: missing `dd.stage` (slice U3 not landed yet) is treated
-  // as 'published' so the gate still passes once the verdict turns positive.
-  const ddStage = review?.dd?.stage ?? 'published';
-  const ddIsPublished = ddStage === 'published';
-  const ddPositive = review?.dd?.final_verdict === 'positive';
+  // A DDR verdict only unlocks the next step after explicit finalize, which
+  // stamps both a published stage and an approver. Save Draft stays editable.
+  const ddIsPublished = stage === 'published' && ddFinalized;
+  const ddPositive = ddFinalVerdict === 'positive' && ddFinalized;
   const agreementStatus = normalizeAgreementStatus(review);
   const agreementReady = agreementAllowsLicensing(agreementStatus);
   const isDelegateForMe = !!myUserId && delegations.some(
@@ -576,12 +603,12 @@ export default function DdrPage() {
       meta={[
         ['Site id', review?.siteId || '—'],
         ['Status',  review?.siteStatus || '—'],
-        ['DD state', review?.legalDdStatus || 'pending'],
+        ['DD state', displayLegalDdStatus],
       ]}
       trail={[
         ['LOI uploaded',     'Completed by BD'],
-        ['Legal review',     review?.legalDdStatus === 'in_review' ? 'In progress' : 'Pending'],
-        ['Legal decision',   review?.dd?.final_verdict && review.dd.final_verdict !== 'pending' ? review.dd.final_verdict : 'Pending'],
+        ['Legal review',     displayLegalDdStatus === 'in_review' ? 'In progress' : 'Pending'],
+        ['Legal decision',   ddFinalized ? ddFinalVerdict : 'Pending'],
       ]}
       header={{
         file: 'No. 05',
@@ -612,6 +639,14 @@ export default function DdrPage() {
       // though svc_submit_dd_for_review accepted it server-side.
       onSubmitForReview={isExecutive ? handleSubmitForReview : undefined}
       submittingForReview={submittingForReview}
+      readOnly={!canEdit}
+      readOnlyText={
+        supervisorLockedByPublished
+          ? 'DDR is published and read-only. Use a BD change request to amend the published source of truth.'
+          : executiveBlockedByDelegation
+            ? 'This site has not been delegated to you yet.'
+            : `DDR is ${stage.replace('_', ' ')} and cannot be edited by this role.`
+      }
     />
     </>
   );
