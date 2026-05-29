@@ -258,6 +258,32 @@ def _assert_executive_can_edit_stage(stage: str) -> None:
         )
 
 
+def _assert_supervisor_can_edit_stage(stage: str) -> None:
+    """Raise 422 if supervisor attempts to edit a row in pending_review.
+
+    Once an executive has submitted a DD draft for review (stage='pending_review'),
+    the supervisor must EITHER finalize the verdict via svc_save_due_diligence
+    (positive → site clears DDR; negative → site moves to LEGAL_REJECTED) OR
+    leave the row untouched. Editing items at this stage would silently rewrite
+    what the executive submitted — breaking the audit trail and the "review
+    what was sent" contract the staged-checklist workflow promises.
+
+    Supervisors may freely edit at stage='draft' (typically only happens when
+    they fix items inline before any executive engagement) and at
+    stage='published' (post-finalization patch-ups).
+    """
+    if stage == "pending_review":
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "DDR is in 'pending_review' and cannot be edited directly. "
+                "Confirm the verdict via the Finalize endpoint instead — the "
+                "auto-positive check will publish a positive verdict if all "
+                "core items are 'yes'."
+            ),
+        )
+
+
 # ── Queue ─────────────────────────────────────────────────────────────────────
 
 async def svc_legal_queue(
@@ -387,6 +413,12 @@ async def svc_save_verification(
             session.add(dd)
         elif is_executive:
             _assert_executive_can_edit_stage(_row_stage(dd))
+        else:
+            # Supervisor path: blocked from editing items while the row sits
+            # in pending_review (executive's submitted draft is locked until
+            # the supervisor confirms via svc_save_due_diligence). Draft and
+            # published rows remain freely editable.
+            _assert_supervisor_can_edit_stage(_row_stage(dd))
 
         # Only overwrite fields that were explicitly supplied
         for field in (

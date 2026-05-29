@@ -177,10 +177,16 @@ export default function DdrPage() {
     (d) => String(d.delegateUserId) === String(myUserId),
   );
   const executiveBlockedByDelegation = isExecutive && !hasMyDelegation;
-  // Edit gate: executives only when stage === 'draft' AND they are delegated.
-  // Supervisors edit any stage.
+  // Edit gate:
+  //  • Executives: stage === 'draft' AND delegated to them.
+  //  • Supervisors: any stage EXCEPT 'pending_review' (the executive's submitted
+  //    draft is locked from edits until the supervisor confirms via Finalize).
+  //    This mirrors svc_save_verification's supervisor stage-gate so an edit
+  //    attempted at pending_review fails server-side anyway.
+  const supervisorLockedByPendingReview = isSupervisor && stage === 'pending_review';
   const canEdit =
-    isSupervisor || (stage === 'draft' && hasMyDelegation);
+    (isSupervisor && !supervisorLockedByPendingReview)
+    || (stage === 'draft' && hasMyDelegation);
 
   const buildPayload = ({ coreStatuses, otherRows }) => {
     const payload = {};
@@ -200,6 +206,11 @@ export default function DdrPage() {
       if (executiveBlockedByDelegation) {
         showToast?.(
           'You do not have an active legal delegation on this site. Ask the legal supervisor to delegate it before saving a draft.',
+          'danger',
+        );
+      } else if (supervisorLockedByPendingReview) {
+        showToast?.(
+          'DDR is awaiting your review — confirm the verdict instead of editing items.',
           'danger',
         );
       } else {
@@ -455,6 +466,33 @@ export default function DdrPage() {
         <span>
           <strong>Read-only:</strong> you have not been delegated this site yet.
           Ask the legal supervisor to delegate it to you before saving a draft.
+        </span>
+      </div>
+    )}
+    {supervisorLockedByPendingReview && (
+      <div
+        className="zm-glass"
+        style={{
+          padding: 14, borderRadius: 10, marginBottom: 12,
+          border: '1px solid var(--zm-accent)',
+          background: 'var(--zm-accent-soft, rgba(82,124,222,0.08))',
+          color: 'var(--zm-fg)',
+          fontFamily: 'var(--zm-font-body)', fontSize: 13,
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}
+        role="status"
+      >
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: 22, height: 22, borderRadius: 999,
+          background: 'var(--zm-accent)', color: '#fff', fontWeight: 900,
+          fontSize: 13,
+        }}>i</span>
+        <span>
+          <strong>Awaiting your review:</strong> the executive submitted this DDR
+          for confirmation. Items are read-only — review what was sent, then
+          confirm to publish (positive if every core item is Yes; negative
+          otherwise).
         </span>
       </div>
     )}

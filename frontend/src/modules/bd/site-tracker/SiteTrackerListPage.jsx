@@ -9,11 +9,16 @@ import { siteTrackerDetailRoute } from '../../../router/routes.js';
 // A site becomes a staging tracker item as soon as BD uploads the signed LOI.
 // Legal owns the editable checklist data; this BD surface reads the live mirror
 // columns and published legal child rows.
+//
+// LEGAL_REJECTED is intentionally NOT tracked here — rejected sites live in
+// the "Due diligence failed" view (DdFailedPage). A site that recovers from
+// rejection (negative → positive via PR #29's auto-recovery) automatically
+// reappears in this list because its status transitions back to LEGAL_REVIEW
+// and its legal_dd_status flips to 'positive'.
 const TRACKED_STATUSES = [
   'loi_uploaded',
   'legal_review',
   'legal_approved',
-  'legal_rejected',
   'pushed_to_payments',
 ];
 
@@ -22,7 +27,6 @@ const FILTERS = [
   { key: 'loi_uploaded',        label: 'LOI signed' },
   { key: 'legal_review',        label: 'Legal review' },
   { key: 'legal_approved',      label: 'Legal cleared' },
-  { key: 'legal_rejected',      label: 'Legal rejected' },
   { key: 'pushed_to_payments',  label: 'Payments handoff' },
 ];
 
@@ -30,7 +34,6 @@ const STAGE_LABELS = {
   loi_uploaded:       'LOI signed',
   legal_review:       'Legal review',
   legal_approved:     'Legal cleared',
-  legal_rejected:     'Legal rejected',
   pushed_to_payments: 'Payments handoff',
 };
 
@@ -722,6 +725,11 @@ export default function SiteTrackerListPage() {
         for (const group of groups) {
           for (const row of group || []) {
             if (!row || seen.has(row.id)) continue;
+            // Defensive: even if a site somehow has status in TRACKED_STATUSES
+            // but legal_dd_status === 'negative' (e.g. row mid-recovery from
+            // a stale mirror column), keep it out of the staging tracker. The
+            // failed-DDR queue owns negative-verdict sites.
+            if (row.legalDdStatus === 'negative') continue;
             seen.add(row.id);
             merged.push(row);
           }
@@ -807,7 +815,7 @@ export default function SiteTrackerListPage() {
         <Metric label="LOI signed" value={counts.loi_uploaded || 0}/>
         <Metric label="Legal review" value={counts.legal_review || 0}/>
         <Metric label="Legal cleared" value={counts.legal_approved || 0}/>
-        <Metric label="Rejected / handoff" value={(counts.legal_rejected || 0) + (counts.pushed_to_payments || 0)}/>
+        <Metric label="Payments handoff" value={counts.pushed_to_payments || 0}/>
       </div>
 
       <FilterBar
