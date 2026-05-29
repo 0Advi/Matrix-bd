@@ -439,17 +439,26 @@ export default function ModuleChecklistPage({
     checks.reduce((acc, item) => ({ ...acc, [item.id]: initialCoreStatuses?.[item.id] ?? null }), {})
   );
   const [otherRows, setOtherRows] = React.useState(() => initialOtherRows || []);
+  const coreSyncKey = checks
+    .map((item) => `${item.id}:${initialCoreStatuses?.[item.id] ?? ''}`)
+    .join('|');
+  const otherSyncKey = JSON.stringify((initialOtherRows || []).map((row) => ({
+    slot: row.slot || '',
+    label: row.label || '',
+    status: row.status || null,
+  })));
 
   // Re-sync when the parent swaps in server-loaded data.
   React.useEffect(() => {
     if (!initialCoreStatuses) return;
     setCoreStatuses(checks.reduce((acc, item) => ({ ...acc, [item.id]: initialCoreStatuses[item.id] ?? null }), {}));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialCoreStatuses]);
+  }, [site.code, coreSyncKey]);
 
   React.useEffect(() => {
     if (initialOtherRows) setOtherRows(initialOtherRows);
-  }, [initialOtherRows]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [site.code, otherSyncKey]);
 
   const setCoreStatus = (id, value) => {
     if (readOnly) return;

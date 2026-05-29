@@ -54,24 +54,6 @@ from app.services.notification_service import (
 logger = logging.getLogger(__name__)
 
 
-# DD fields used for the auto-positive check in svc_save_verification.
-# Core fields — all 7 must be 'yes' for auto-positive to fire.
-# Optional slots (other_1 / other_2) are free-form additions whose values are
-# NEVER NULL in the DB (schema is NOT NULL DEFAULT 'pending'). They must NOT
-# block the positive verdict in their default 'pending' state — that's the
-# "not used on this site" signal. If a supervisor has actively engaged them
-# they must mark them 'yes'; any 'no' blocks auto-positive. NULL is kept in
-# the allow-list as a defensive guard in case the schema is ever loosened.
-_CORE_DD_FIELDS = (
-    "title_doc", "sanctioned_plan", "oc_cc", "commercial_use",
-    "property_tax", "electricity", "fire_noc",
-)
-_OPTIONAL_DD_FIELDS = ("other_1", "other_2")
-# Values in the optional slots that do NOT block auto-positive recovery.
-# 'pending' is the schema default — see _OPTIONAL_DD_FIELDS comment above.
-_OPTIONAL_DD_NON_BLOCKING = (None, "pending", "yes")
-
-
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 async def _fetch_dd_or_none(
@@ -279,8 +261,8 @@ def _assert_supervisor_can_edit_stage(stage: str) -> None:
     change_request_service.approve_change_request) so the audit trail captures
     who requested the change, what was approved, and why. The
     _maybe_recover_dd_verdict helper in that service handles the verdict +
-    site-status side-effects symmetrically with svc_save_verification's
-    auto-positive check, so both paths converge on the same outcome.
+    site-status side-effects through the same explicit publish/finalize
+    boundary used by supervisor review.
 
     Supervisors remain free to edit at stage='draft' (typically only when
     they're fixing items inline before any executive submission) and at
@@ -413,7 +395,9 @@ async def svc_save_verification(
         (site, module='legal'). On insert, stage starts at 'draft'. They may
         only update rows whose stage is 'draft'; pending_review / published
         raise 422.
-      - Supervisor callers are unrestricted (can write at any stage).
+      - Supervisor callers may edit draft / pending_review rows. Published
+        rows are read-only unless the row is an old unfinalized draft that was
+        accidentally stamped published by the previous Save Draft path.
     """
     async with transaction(session):
         site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
@@ -430,8 +414,8 @@ async def svc_save_verification(
 
         # Executives cannot directly edit a LEGAL_REJECTED site — they must
         # open a change request (POST /legal/change-requests) so there is a
-        # formal approval trail.  Supervisors may edit directly; the auto-positive
-        # check below will recover the site to LEGAL_REVIEW if all items pass.
+        # formal approval trail. Supervisors may only edit unfinalized rows;
+        # final legal recovery remains tied to explicit publish/finalize paths.
         if (
             site.status == SiteStatus.LEGAL_REJECTED.value
             and actor.get("role") == "executive"
@@ -454,22 +438,32 @@ async def svc_save_verification(
         dd = await _fetch_dd_or_none(session, site_id=site.id)
         if dd is None:
             dd = models.LegalDdChecklist(site_id=site.id)
-            # Executive-initiated rows start as drafts; supervisor inserts
-            # behave as before (default: 'published').
-            if is_executive:
-                dd.stage = "draft"
+            # Item saves are drafts regardless of who starts them. Only
+            # svc_save_due_diligence publishes DDR, so Save Draft never locks
+            # the checklist or exposes a final BD-visible verdict.
+            dd.stage = "draft"
             session.add(dd)
         elif is_executive:
             _assert_executive_can_edit_stage(_row_stage(dd))
         else:
-            # Supervisor path: blocked from editing items once the row is
-            # published — BD reads published rows as the source of truth, so
-            # any post-publish change must flow through the change-request
-            # path (where the request + approval are explicitly logged).
-            # Draft and pending_review rows remain freely editable so the
-            # supervisor can adjust items either before the executive submits
-            # or after reviewing what they sent.
-            _assert_supervisor_can_edit_stage(_row_stage(dd))
+            if _row_stage(dd) == "published" and dd.approved_by is None:
+                # Repair rows created by the previous Save Draft path, where
+                # supervisor item saves could accidentally leave an
+                # unfinalized checklist in the published/read-only stage.
+                dd.stage = "draft"
+                if dd.final_verdict != "pending":
+                    dd.final_verdict = "pending"
+                    dd.rejection_reason = None
+                    site.legal_dd_status = "in_review"
+            else:
+                # Supervisor path: blocked from editing items once the row is
+                # published — BD reads published rows as the source of truth, so
+                # any post-publish change must flow through the change-request
+                # path (where the request + approval are explicitly logged).
+                # Draft and pending_review rows remain freely editable so the
+                # supervisor can adjust items either before the executive submits
+                # or after reviewing what they sent.
+                _assert_supervisor_can_edit_stage(_row_stage(dd))
 
         # Only overwrite fields that were explicitly supplied
         for field in (
@@ -495,64 +489,18 @@ async def svc_save_verification(
 
         dd.reviewed_by = actor["sub"]
 
-        # ── Auto-positive check with LEGAL_REJECTED recovery ─────────────────
-        # After every supervisor edit, check if all required DD items are 'yes'.
-        # Rule: 7 core items must be 'yes'; other_1/other_2 must be in
-        # _OPTIONAL_DD_NON_BLOCKING (None, 'pending', 'yes') — i.e. not 'no'.
-        # The schema defaults other_1/other_2 to 'pending', so a supervisor who
-        # never touches those fields still gets auto-positive once the 7 core
-        # items are green (matches the original PR #29 intent — see the
-        # _OPTIONAL_DD_FIELDS docstring).
-        # If the bar is met:
-        #   1. final_verdict → 'positive', legal_dd_status → 'positive'
-        #   2. If site was LEGAL_REJECTED, transition back to LEGAL_REVIEW so
-        #      it re-enters the active workflow and reappears in the queue.
-        #
-        # This is the direct-edit recovery path for supervisors.  BD executives
-        # go through change_request_service (_maybe_recover_dd_verdict) which
-        # uses the same core/optional split.
-        # A verdict already 'positive' is never downgraded here.
-        if dd.final_verdict != "positive":
-            all_required_yes = (
-                all(getattr(dd, f) == "yes" for f in _CORE_DD_FIELDS)
-                and all(getattr(dd, f) in _OPTIONAL_DD_NON_BLOCKING for f in _OPTIONAL_DD_FIELDS)
-            )
-            if all_required_yes:
-                dd.final_verdict = "positive"
-                site.legal_dd_status = "positive"
-                was_rejected = site.status == SiteStatus.LEGAL_REJECTED.value
-                if was_rejected:
-                    assert_transition(SiteStatus.LEGAL_REJECTED, SiteStatus.LEGAL_REVIEW)
-                    site.status = SiteStatus.LEGAL_REVIEW.value
-                    site.legal_rejected_at = None
-                await write_audit_event(
-                    session, tenant_id=tenant_id, site_id=site.id,
-                    actor_id=actor["sub"], actor_name=actor["name"],
-                    action="legal_dd_auto_positive",
-                    detail=(
-                        "All DD items marked yes — verdict auto-set to positive"
-                        + ("; site recovered to LEGAL_REVIEW" if was_rejected else "")
-                    ),
-                )
-            else:
-                # Still working through items.  Reset mirror to 'in_review'
-                # to show the queue badge as "in progress" even if recovering
-                # from a 'negative' verdict.
-                site.legal_dd_status = "in_review"
-                await write_audit_event(
-                    session, tenant_id=tenant_id, site_id=site.id,
-                    actor_id=actor["sub"], actor_name=actor["name"],
-                    action="legal_dd_items_saved",
-                    detail="DD checklist items updated",
-                )
-        else:
-            # Verdict already positive — save as supplementary edits only.
-            await write_audit_event(
-                session, tenant_id=tenant_id, site_id=site.id,
-                actor_id=actor["sub"], actor_name=actor["name"],
-                action="legal_dd_items_saved",
-                detail="DD checklist items updated (post-positive)",
-            )
+        # Save Draft is not a legal verdict. Keep the BD-visible mirror in
+        # review until the supervisor explicitly finalizes positive/negative
+        # via svc_save_due_diligence, which also publishes the row.
+        if dd.final_verdict == "pending":
+            site.legal_dd_status = "in_review"
+
+        await write_audit_event(
+            session, tenant_id=tenant_id, site_id=site.id,
+            actor_id=actor["sub"], actor_name=actor["name"],
+            action="legal_dd_items_saved",
+            detail="DD checklist items updated",
+        )
 
     return await _build_review_response(session, site)
 
