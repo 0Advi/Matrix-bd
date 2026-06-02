@@ -23,6 +23,8 @@ import ChangeRequestsPage    from '../modules/legal/ChangeRequestsPage.jsx';
 import RejectedSitesPage     from '../modules/legal/RejectedSitesPage.jsx';
 import DdrPage               from '../modules/legal/ddr/DdrPage.jsx';
 import AgreementPage         from '../modules/legal/agreement/AgreementPage.jsx';
+import DesignQueuePage       from '../modules/design/DesignQueuePage.jsx';
+import DesignReviewPage      from '../modules/design/DesignReviewPage.jsx';
 import SiteStatusPage        from '../modules/bd/site-status/SiteStatusPage.jsx';
 import DdFailedPage          from '../modules/bd/dd-failed/DdFailedPage.jsx';
 import SiteTrackerListPage   from '../modules/bd/site-tracker/SiteTrackerListPage.jsx';
@@ -42,6 +44,7 @@ function homeForRoleModule(role, module) {
   if (role === 'business_admin') return '/business-admin';
   if (module === 'legal')        return ROUTES.LEGAL;
   if (module === 'payment')      return ROUTES.PAYMENT;
+  if (module === 'design')       return ROUTES.DESIGN;
   return ROUTES.OVERVIEW; // BD (or unknown → default to BD)
 }
 
@@ -80,6 +83,7 @@ function IndexRedirect() {
   if (USE_MOCK) return <OverviewPage/>; // mock mode stays on BD
   if (module === 'legal')   return <Navigate to="/legal" replace/>;
   if (module === 'payment') return <Navigate to="/payment" replace/>;
+  if (module === 'design')  return <Navigate to="/design" replace/>;
   return <OverviewPage/>;
 }
 
@@ -183,6 +187,22 @@ export default function AppRouter() {
           <PaymentLicensingRedirect/>
         }/>
         <Route path="/payment/*" element={<Navigate to={ROUTES.PAYMENT} replace/>}/>
+
+        <Route path={ROUTES.DESIGN} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['design']}>
+              <DesignQueuePage/>
+            </RequireModule>
+          </RequireRole>
+        }/>
+        <Route path={ROUTES.DESIGN_SITE} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['design']}>
+              <DesignReviewPage/>
+            </RequireModule>
+          </RequireRole>
+        }/>
+        <Route path="/design/*" element={<Navigate to={ROUTES.DESIGN} replace/>}/>
 
         <Route path={ROUTES.DD_FAILED} element={
           <RequireRole roles={['supervisor', 'executive', 'exec']}>

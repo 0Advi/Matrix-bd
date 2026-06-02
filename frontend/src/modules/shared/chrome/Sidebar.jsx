@@ -87,9 +87,9 @@ export default function Sidebar({ counts, role, onRole, collapsed = false }) {
   // current URL when the session has no module claim (mock-mode previews, where
   // we still want the right menu to render based on where the user clicked).
   const path = location.pathname;
-  const routeModule = path.startsWith('/legal') ? 'legal' : path.startsWith('/payment') ? 'payment' : 'bd';
+  const routeModule = path.startsWith('/legal') ? 'legal' : path.startsWith('/payment') ? 'payment' : path.startsWith('/design') ? 'design' : 'bd';
   const userModule = session?.module || routeModule;
-  const isModuleSurface = userModule === 'legal' || userModule === 'payment';
+  const isModuleSurface = userModule === 'legal' || userModule === 'payment' || userModule === 'design';
 
   // Active view derived from current URL path
   const activeView =
@@ -105,6 +105,7 @@ export default function Sidebar({ counts, role, onRole, collapsed = false }) {
     path === ROUTES.LEGAL_REJECTED                       ? 'legal-rejected' :
     path.startsWith('/legal')                            ? 'legal-ddr' :
     path.startsWith('/payment')                          ? 'payment-licensing' :
+    path.startsWith('/design')                           ? 'design' :
     'overview';
 
   const go = (route) => navigate(route);
@@ -171,6 +172,18 @@ export default function Sidebar({ counts, role, onRole, collapsed = false }) {
             active={activeView === 'payment-licensing'}
             onClick={() => go(ROUTES.PAYMENT)}
             collapsed={collapsed}
+          />
+        </>
+      )}
+
+      {userModule === 'design' && (
+        <>
+          <div style={{ ...SECTION_HEADING_STYLE, padding: '4px 10px 6px' }}>Design</div>
+          <SidebarItem
+            icon="box"
+            label="Design queue"
+            active={activeView === 'design'}
+            onClick={() => go(ROUTES.DESIGN)}
           />
         </>
       )}

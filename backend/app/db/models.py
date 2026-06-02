@@ -129,6 +129,11 @@ class Site(Base):
     legal_dd_status: Mapped[Optional[str]] = mapped_column(Text, server_default="pending")
     agreement_status: Mapped[Optional[str]] = mapped_column(Text, server_default="pending")
     licensing_status: Mapped[Optional[str]] = mapped_column(Text, server_default="pending")
+    # Design module mirror — a PARALLEL track that opens once legal_dd_status='positive'
+    # (DDR cleared). The design module owns this column; BD/dashboards read it.
+    # Values: pending | allocated | in_progress | gfc_pending | approved | rejected
+    design_status: Mapped[Optional[str]] = mapped_column(Text, server_default="pending")
+    design_approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     # Finance / CA code flow (managed from the Site Tracker Finance tab).
     # Once ca_code is set it replaces site.code as the display identifier.
@@ -347,7 +352,7 @@ class SiteDelegation(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
     __table_args__ = (
-        CheckConstraint("module IN ('bd','legal','payment')", name="chk_site_delegations_module"),
+        CheckConstraint("module IN ('bd','legal','payment','design')", name="chk_site_delegations_module"),
     )
 
 
@@ -534,4 +539,93 @@ class LegalChangeRequest(Base):
         Index("idx_lcr_tenant_status", "tenant_id", "status"),
         Index("idx_lcr_site", "site_id"),
         Index("idx_lcr_requested_by", "requested_by"),
+    )
+
+
+# ── Design workflow child tables ───────────────────────────────────────────────
+# A PARALLEL track that opens once a site's legal_dd_status flips to 'positive'
+# (DDR cleared). Mirrors the Legal pattern: child tables hold the granular detail;
+# the parent `sites.design_status` column is what BD/dashboards read. The linear
+# site state machine (state_machine.py) is deliberately NOT touched — design is an
+# annotation track like the recently-added sites.finance_status.
+
+class DesignReview(Base):
+    """One row per site — the design "folder".
+
+    Tracks which deliverable is active (`current_stage`) and the business_admin's
+    GFC (Good-For-Construction) gate.
+
+      current_stage: 'recce' | '2d' | '3d' | 'boq' | 'gfc' | 'done'
+      gfc_status:    'pending' | 'approved' | 'rejected'  (business_admin owns it)
+
+    gfc_comments are written by the admin and are visible to the design supervisor.
+    """
+    __tablename__ = "design_reviews"
+
+    site_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sites.id", ondelete="CASCADE"), primary_key=True,
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False,
+    )
+    current_stage: Mapped[str] = mapped_column(Text, nullable=False, server_default="recce")
+    gfc_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    gfc_comments: Mapped[Optional[str]] = mapped_column(Text)
+    gfc_decided_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    gfc_decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    reviewed_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))   # design exec
+    approved_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))   # design supervisor
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False,
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "current_stage IN ('recce','2d','3d','boq','gfc','done')",
+            name="chk_design_current_stage",
+        ),
+        CheckConstraint(
+            "gfc_status IN ('pending','approved','rejected')",
+            name="chk_design_gfc_status",
+        ),
+        Index("idx_design_reviews_tenant", "tenant_id"),
+    )
+
+
+class DesignDeliverable(Base):
+    """One row per (site, kind). Each deliverable independently runs the
+    executive-upload → supervisor-review loop.
+
+      kind:   'recce' | '2d' | '3d' | 'boq'
+      status: 'pending' | 'submitted' | 'approved' | 'rejected'
+
+    `supervisor_comments` are visible to the executive (the reject → re-upload
+    loop). `estimated_amount` is only meaningful for kind='boq'.
+    """
+    __tablename__ = "design_deliverables"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    site_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    file_url: Mapped[Optional[str]] = mapped_column(Text)
+    file_name: Mapped[Optional[str]] = mapped_column(Text)
+    estimated_amount: Mapped[Optional[float]] = mapped_column(Numeric(14, 2))
+    supervisor_comments: Mapped[Optional[str]] = mapped_column(Text)
+    submitted_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    reviewed_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("site_id", "kind", name="uq_design_deliverable_site_kind"),
+        CheckConstraint("kind IN ('recce','2d','3d','boq')", name="chk_design_deliverable_kind"),
+        CheckConstraint("status IN ('pending','submitted','approved','rejected')", name="chk_design_deliverable_status"),
+        Index("idx_design_deliverables_site", "site_id"),
     )

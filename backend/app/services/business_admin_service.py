@@ -24,7 +24,7 @@ from app.domain.schemas.business_admin import Module
 
 
 _PENDING_MODULE_PREFIX = "pending_module:"
-_VALID_MODULES: frozenset[str] = frozenset(("bd", "legal", "payment"))
+_VALID_MODULES: frozenset[str] = frozenset(("bd", "legal", "payment", "design"))
 
 
 def _new_dept_code() -> str:

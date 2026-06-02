@@ -248,7 +248,7 @@ async def actor_has_delegation_for_site(
 # or absent. This keeps executive flows usable even before the migration has
 # landed in every environment.
 
-_VALID_MODULES = {"bd", "legal", "payment"}
+_VALID_MODULES = {"bd", "legal", "payment", "design"}
 
 
 def _assert_module(module: str) -> str:

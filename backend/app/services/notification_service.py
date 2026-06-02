@@ -66,6 +66,47 @@ async def recipients_for_legal_supervisors(
     return [row[0] for row in rows]
 
 
+async def recipients_for_design_supervisors(
+    session: AsyncSession, *, tenant_id: str | UUID,
+) -> list[UUID]:
+    """Supervisors whose module membership is 'design' in this tenant.
+
+    Same membership-based resolution as recipients_for_legal_supervisors — in the
+    3-role model design staff are role=supervisor / role=executive scoped to
+    module='design'.
+    """
+    rows = await session.execute(
+        text(
+            """
+            SELECT u.id
+              FROM user_module_memberships m
+              JOIN users u ON u.id = m.user_id
+             WHERE m.tenant_id  = :tenant_id
+               AND m.module     = 'design'
+               AND m.role_in_module = 'supervisor'
+               AND u.is_active  = true
+            """
+        ),
+        {"tenant_id": str(tenant_id)},
+    )
+    return [row[0] for row in rows]
+
+
+async def recipients_for_business_admins(
+    session: AsyncSession, *, tenant_id: str | UUID,
+) -> list[UUID]:
+    """All business_admins in the tenant (role == 'business_admin').
+
+    Used by the Design module to notify admins when a site reaches the GFC gate.
+    """
+    stmt = select(models.User.id).where(
+        models.User.tenant_id == tenant_id,
+        models.User.is_active.is_(True),
+        models.User.role == Role.BUSINESS_ADMIN.value,
+    )
+    return [r for r in (await session.execute(stmt)).scalars().all()]
+
+
 async def recipients_for_site_owner(
     session: AsyncSession, *, site: models.Site,
 ) -> list[UUID]:
