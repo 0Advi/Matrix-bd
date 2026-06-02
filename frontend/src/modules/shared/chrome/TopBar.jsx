@@ -37,14 +37,14 @@ export default function TopBar({ user, role, dark, onToggleDark, onNewPipeline, 
     }}>
       <div className="zm-brand-plate" style={{
         width: sidebarCollapsed ? 72 : 232, flex: `0 0 ${sidebarCollapsed ? 72 : 232}px`,
-        display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-        gap: 10, padding: sidebarCollapsed ? '0 10px' : '0 12px',
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
+        gap: 10, padding: sidebarCollapsed ? '0 8px 0 12px' : '0 12px',
         color: '#F5F2EC',
         borderRight: '1px solid var(--zm-line)',
         position: 'relative',
         transition: 'width 220ms var(--zm-ease), flex-basis 220ms var(--zm-ease), padding 220ms var(--zm-ease)',
       }}>
-        <svg className="zm-brand-cube" width={sidebarCollapsed ? 30 : 34} height={sidebarCollapsed ? 30 : 34} viewBox="0 0 64 64" fill="none" style={{ display: 'block', flex: '0 0 auto', position: 'relative', zIndex: 1 }}>
+        <svg className="zm-brand-cube" width={sidebarCollapsed ? 28 : 34} height={sidebarCollapsed ? 28 : 34} viewBox="0 0 64 64" fill="none" style={{ display: 'block', flex: '0 0 auto', position: 'relative', zIndex: 1 }}>
           <g stroke="#7AE7DA" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" opacity="0.55">
             <path d="M22 10 L58 10 L58 46 L22 46 Z"/>
             <path d="M6 22 L22 10"/><path d="M42 22 L58 10"/>
@@ -61,7 +61,7 @@ export default function TopBar({ user, role, dark, onToggleDark, onNewPipeline, 
           whiteSpace: 'nowrap', position: 'relative', zIndex: 1,
           display: sidebarCollapsed ? 'none' : 'inline',
           textShadow: '0 1px 0 rgba(0,0,0,0.35), 0 0 24px rgba(122,231,218,0.15)',
-        }}>z‑matrix</span>
+        }}>Scale</span>
         <span style={{
           position: 'absolute', top: 12, right: 12,
           width: 5, height: 5, borderRadius: 999,
@@ -77,10 +77,10 @@ export default function TopBar({ user, role, dark, onToggleDark, onNewPipeline, 
             onClick={onToggleSidebar}
             style={{
               position: 'absolute',
-              right: sidebarCollapsed ? -12 : 8,
+              right: sidebarCollapsed ? 6 : 8,
               bottom: 12,
-              width: 24,
-              height: 24,
+              width: sidebarCollapsed ? 22 : 24,
+              height: sidebarCollapsed ? 22 : 24,
               borderRadius: 8,
               border: '1px solid rgba(245,242,236,0.28)',
               background: 'rgba(9, 20, 20, 0.62)',
