@@ -188,7 +188,7 @@ export default function Sidebar({ counts, role, onRole, collapsed = false }) {
           <div style={{ ...SECTION_HEADING_STYLE, padding: '4px 10px 6px' }}>Design</div>
           <SidebarItem
             icon="box"
-            label="Design queue"
+            label="Sites"
             active={activeView === 'design'}
             onClick={() => go(ROUTES.DESIGN)}
           />
