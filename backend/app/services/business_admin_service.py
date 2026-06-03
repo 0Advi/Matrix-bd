@@ -19,6 +19,7 @@ from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import desc, select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import models
@@ -226,10 +227,14 @@ async def list_admin_sites(
     site_ids = [site.id for site in rows]
     project_by_site = {}
     if site_ids:
-        project_rows = (await session.execute(
-            select(models.ProjectReview).where(models.ProjectReview.site_id.in_(site_ids))
-        )).scalars().all()
-        project_by_site = {row.site_id: row for row in project_rows}
+        try:
+            project_rows = (await session.execute(
+                select(models.ProjectReview).where(models.ProjectReview.site_id.in_(site_ids))
+            )).scalars().all()
+            project_by_site = {row.site_id: row for row in project_rows}
+        except SQLAlchemyError:
+            await session.rollback()
+            project_by_site = {}
 
     user_ids = set()
     for site in rows:
