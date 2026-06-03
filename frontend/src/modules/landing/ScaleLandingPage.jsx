@@ -679,7 +679,6 @@ function AuthModal({ mode, onMode, onClose, prefillEmail }) {
     if (payload?.module === 'legal')   return '/legal';
     if (payload?.module === 'payment') return '/payment';
     if (payload?.module === 'design')  return '/design';
-    if (payload?.module === 'recce')   return '/recce';
     if (payload?.module === 'project') return '/project';
     return '/overview';
   };

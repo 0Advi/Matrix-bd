@@ -7,7 +7,7 @@ module talks to them via raw `text()` queries.
 Pending supervisors are encoded in the existing `users` table as
 `role='supervisor' AND is_active=false`. The module they applied for is
 stashed in `users.notes` as the marker
-`pending_module:<bd|legal|payment|design|recce|project>`.
+`pending_module:<bd|legal|payment|design|project>`.
 On approval we activate the user, drop the marker, and register the module
 membership; on rejection we delete the row.
 """
@@ -25,7 +25,7 @@ from app.domain.schemas.business_admin import Module
 
 
 _PENDING_MODULE_PREFIX = "pending_module:"
-_VALID_MODULES: frozenset[str] = frozenset(("bd", "legal", "payment", "design", "recce", "project"))
+_VALID_MODULES: frozenset[str] = frozenset(("bd", "legal", "payment", "design", "project"))
 
 
 def _new_dept_code() -> str:

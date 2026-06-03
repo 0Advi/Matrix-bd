@@ -34,7 +34,6 @@ import LicensingPage         from '../modules/payment/licensing/LicensingPage.js
 import PaymentStubPage       from '../modules/payment/PaymentStubPage.jsx';
 import AdminPortalPage          from '../modules/admin/AdminPortalPage.jsx';
 import BusinessAdminPortalPage  from '../modules/business-admin/BusinessAdminPortalPage.jsx';
-import RecceStubPage            from '../modules/recce/RecceStubPage.jsx';
 import ProjectStubPage          from '../modules/project/ProjectStubPage.jsx';
 
 // In HTTP (non-mock) mode the landing page is the unauthenticated entry. The
@@ -47,7 +46,6 @@ function homeForRoleModule(role, module) {
   if (module === 'legal')        return ROUTES.LEGAL;
   if (module === 'payment')      return ROUTES.PAYMENT;
   if (module === 'design')       return ROUTES.DESIGN;
-  if (module === 'recce')        return ROUTES.RECCE;
   if (module === 'project')      return ROUTES.PROJECT;
   return ROUTES.OVERVIEW; // BD / unknown → default to BD overview
 }
@@ -88,7 +86,6 @@ function IndexRedirect() {
   if (module === 'legal')   return <Navigate to={ROUTES.LEGAL}   replace/>;
   if (module === 'payment') return <Navigate to={ROUTES.PAYMENT} replace/>;
   if (module === 'design')  return <Navigate to={ROUTES.DESIGN}  replace/>;
-  if (module === 'recce')   return <Navigate to={ROUTES.RECCE}   replace/>;
   if (module === 'project') return <Navigate to={ROUTES.PROJECT} replace/>;
   return <OverviewPage/>;
 }
@@ -209,15 +206,6 @@ export default function AppRouter() {
           </RequireRole>
         }/>
         <Route path="/design/*" element={<Navigate to={ROUTES.DESIGN} replace/>}/>
-
-        <Route path={ROUTES.RECCE} element={
-          <RequireRole roles={['supervisor', 'executive', 'exec']}>
-            <RequireModule modules={['recce']}>
-              <RecceStubPage/>
-            </RequireModule>
-          </RequireRole>
-        }/>
-        <Route path="/recce/*" element={<Navigate to={ROUTES.RECCE} replace/>}/>
 
         <Route path={ROUTES.PROJECT} element={
           <RequireRole roles={['supervisor', 'executive', 'exec']}>
