@@ -1,13 +1,12 @@
 import React from 'react';
 import { listPendingSupervisors, approveSupervisor, rejectSupervisor } from '../../services/api/adapters/httpAdapter.js';
 
+// Payment + Recce omitted — Recce is part of Design, Payment isn't dept-onboarded.
 const FILTERS = [
   { key: 'all',     label: 'All' },
   { key: 'bd',      label: 'BD' },
   { key: 'legal',   label: 'Legal' },
-  { key: 'payment', label: 'Payment' },
   { key: 'design',  label: 'Design' },
-  { key: 'recce',   label: 'Recce' },
   { key: 'project', label: 'Project' },
 ];
 
