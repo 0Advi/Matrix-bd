@@ -4,6 +4,7 @@ import { decodeJwtPayload } from './jwt.js';
 import DeptCodeManager from './DeptCodeManager.jsx';
 import PendingSupervisorsList from './PendingSupervisorsList.jsx';
 import DesignGfcQueue from './DesignGfcQueue.jsx';
+import DesignDeliverableApprovals from './DesignDeliverableApprovals.jsx';
 
 export default function TeamDashboard({ onLogout }) {
   const payload = decodeJwtPayload(getAuthToken());
@@ -23,6 +24,11 @@ export default function TeamDashboard({ onLogout }) {
       <section style={{ marginBottom: 32 }}>
         <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 14px', color: 'rgba(255,255,255,0.92)' }}>Department codes</h2>
         <DeptCodeManager/>
+      </section>
+
+      <section style={{ marginBottom: 32 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 14px', color: 'rgba(255,255,255,0.92)' }}>Design · 2D / 3D approvals</h2>
+        <DesignDeliverableApprovals/>
       </section>
 
       <section style={{ marginBottom: 32 }}>

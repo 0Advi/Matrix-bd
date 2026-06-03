@@ -25,12 +25,14 @@ from __future__ import annotations
 
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status as http_status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status as http_status
 
 from app.core.deps import DbDep, TenantId
 from app.domain.schemas.common import OkResponse
 from app.domain.schemas.design import (
+    AdminReviewDeliverableRequest,
     AllocateDesignRequest,
+    DesignAdminQueueResponse,
     DesignGfcQueueResponse,
     DesignQueueResponse,
     DesignReviewResponse,
@@ -42,7 +44,9 @@ from app.rbac.guards import require_module, require_role
 from app.rbac.roles import Role
 from app.services.delegation_service import svc_assigned_sites, svc_is_delegated
 from app.services.design_service import (
+    svc_admin_review_deliverable,
     svc_allocate_design,
+    svc_design_admin_queue,
     svc_design_gfc_queue,
     svc_design_queue,
     svc_get_design_review,
@@ -52,6 +56,7 @@ from app.services.design_service import (
     svc_revoke_design_delegation,
     svc_submit_deliverable,
 )
+from app.services.storage_service import upload_bytes as storage_upload
 
 router = APIRouter(prefix="/design", tags=["Design"])
 
@@ -133,6 +138,39 @@ async def design_gfc_decision(
 ) -> DesignReviewResponse:
     return await svc_gfc_decision(
         db, tenant_id=tenant_id, actor=current_user, site_id=site_id, body=body,
+    )
+
+
+# ── Business-admin 2D/3D approval (second tier; require_role only) ────────────
+
+@router.get(
+    "/admin-queue",
+    response_model=DesignAdminQueueResponse,
+    summary="2D/3D deliverables awaiting business-admin approval, grouped by site",
+)
+async def design_admin_queue(
+    db: DbDep,
+    current_user: BusinessAdmin,
+    tenant_id: TenantId,
+) -> DesignAdminQueueResponse:
+    return await svc_design_admin_queue(db, tenant_id=tenant_id)
+
+
+@router.post(
+    "/{site_id}/deliverables/{kind}/admin-review",
+    response_model=DesignReviewResponse,
+    summary="Business admin: approve / send back a supervisor-approved 2D or 3D deliverable",
+)
+async def admin_review_deliverable(
+    site_id: str,
+    kind: str,
+    body: AdminReviewDeliverableRequest,
+    db: DbDep,
+    current_user: BusinessAdmin,
+    tenant_id: TenantId,
+) -> DesignReviewResponse:
+    return await svc_admin_review_deliverable(
+        db, tenant_id=tenant_id, actor=current_user, site_id=site_id, kind=kind, body=body,
     )
 
 
@@ -226,6 +264,33 @@ async def review_deliverable(
 ) -> DesignReviewResponse:
     return await svc_review_deliverable(
         db, tenant_id=tenant_id, actor=current_user, site_id=site_id, kind=kind, body=body,
+    )
+
+
+@router.post(
+    "/{site_id}/deliverables/{kind}/upload",
+    response_model=DesignReviewResponse,
+    summary="Upload a deliverable document (recce/2d/3d) to storage and submit it",
+)
+async def upload_deliverable(
+    site_id: str,
+    kind: str,
+    db: DbDep,
+    current_user: DesignMember,
+    _module: InDesignModule,
+    tenant_id: TenantId,
+    file: UploadFile = File(...),
+) -> DesignReviewResponse:
+    body_bytes = await file.read()
+    safe_name = (file.filename or "document").replace("/", "_").replace("\\", "_")
+    path = f"design/{site_id}/{kind}/{safe_name}"
+    await storage_upload(
+        path=path, body=body_bytes,
+        content_type=file.content_type or "application/octet-stream",
+    )
+    req = SubmitDeliverableRequest(file_url=path, file_name=safe_name)
+    return await svc_submit_deliverable(
+        db, tenant_id=tenant_id, actor=current_user, site_id=site_id, kind=kind, body=req,
     )
 
 

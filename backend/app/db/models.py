@@ -618,6 +618,12 @@ class DesignDeliverable(Base):
     submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     reviewed_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # Second-tier business_admin approval — required for 2D and 3D (only) before
+    # they advance. 'pending' for unreviewed; recce/boq never use it.
+    admin_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    admin_comments: Mapped[Optional[str]] = mapped_column(Text)
+    admin_reviewed_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    admin_reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False,
@@ -627,5 +633,6 @@ class DesignDeliverable(Base):
         UniqueConstraint("site_id", "kind", name="uq_design_deliverable_site_kind"),
         CheckConstraint("kind IN ('recce','2d','3d','boq')", name="chk_design_deliverable_kind"),
         CheckConstraint("status IN ('pending','submitted','approved','rejected')", name="chk_design_deliverable_status"),
+        CheckConstraint("admin_status IN ('pending','approved','rejected')", name="chk_design_deliverable_admin_status"),
         Index("idx_design_deliverables_site", "site_id"),
     )

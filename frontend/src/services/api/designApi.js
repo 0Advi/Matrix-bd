@@ -69,7 +69,26 @@ function deliverableFromServer(d) {
     submittedAt:        d.submitted_at,
     reviewedBy:         d.reviewed_by,
     reviewedAt:         d.reviewed_at,
+    adminStatus:        d.admin_status,
+    adminComments:      d.admin_comments,
+    downloadUrl:        d.download_url,
     updatedAt:          d.updated_at,
+  };
+}
+
+function adminQueueSiteFromServer(s) {
+  return {
+    siteId:   s.site_id,
+    siteCode: s.site_code,
+    siteName: s.site_name,
+    city:     s.city,
+    deliverables: (s.deliverables || []).map((d) => ({
+      kind:        d.kind,
+      status:      d.status,
+      fileName:    d.file_name,
+      downloadUrl: d.download_url,
+      submittedAt: d.submitted_at,
+    })),
   };
 }
 
@@ -184,5 +203,29 @@ export async function decideGfc(siteId, { decision, comments }) {
   const body = { decision };
   if (comments) body.comments = comments;
   const data = await client.post(`/design/gfc/${siteId}`, body).then((r) => r.data);
+  return reviewFromServer(data);
+}
+
+// ── Document upload (recce / 2d / 3d) ────────────────────────────────────────
+
+export async function uploadDeliverable(siteId, kind, file) {
+  const form = new FormData();
+  form.append('file', file);
+  // axios sets the multipart Content-Type (with boundary) automatically for FormData.
+  const data = await client.post(`/design/${siteId}/deliverables/${kind}/upload`, form).then((r) => r.data);
+  return reviewFromServer(data);
+}
+
+// ── Business-admin 2D/3D approval (second tier) ──────────────────────────────
+
+export async function getDesignAdminQueue() {
+  const data = await client.get('/design/admin-queue').then((r) => r.data);
+  return { items: (data.items || []).map(adminQueueSiteFromServer), total: data.total ?? 0 };
+}
+
+export async function adminReviewDeliverable(siteId, kind, { decision, comments }) {
+  const body = { decision };
+  if (comments) body.comments = comments;
+  const data = await client.post(`/design/${siteId}/deliverables/${kind}/admin-review`, body).then((r) => r.data);
   return reviewFromServer(data);
 }

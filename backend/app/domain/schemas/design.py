@@ -90,6 +90,9 @@ class DeliverableResponse(BaseModel):
     submitted_at: Optional[datetime] = None
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[datetime] = None
+    admin_status: str = "pending"            # 2D/3D second-tier (business_admin) gate
+    admin_comments: Optional[str] = None
+    download_url: Optional[str] = None       # short-lived signed URL for the uploaded file
     updated_at: Optional[datetime] = None
 
 
@@ -141,4 +144,40 @@ class DesignGfcQueueItem(BaseModel):
 
 class DesignGfcQueueResponse(BaseModel):
     items: list[DesignGfcQueueItem]
+    total: int
+
+
+# ── Admin 2D/3D approval queue (grouped by site) ─────────────────────────────
+
+class AdminReviewDeliverableRequest(BaseModel):
+    """Business admin's decision on a supervisor-approved 2D/3D deliverable."""
+    decision: ReviewDecision
+    comments: Optional[str] = None
+
+    @field_validator("comments")
+    @classmethod
+    def comments_required_on_reject(cls, v: Optional[str], info) -> Optional[str]:
+        if info.data.get("decision") == "reject" and not (v and v.strip()):
+            raise ValueError("comments are required when sending a deliverable back")
+        return v
+
+
+class AdminQueueDeliverable(BaseModel):
+    kind: DeliverableKind
+    status: DeliverableStatus
+    file_name: Optional[str] = None
+    download_url: Optional[str] = None
+    submitted_at: Optional[datetime] = None
+
+
+class DesignAdminQueueSite(BaseModel):
+    site_id: str
+    site_code: str
+    site_name: str
+    city: str
+    deliverables: list[AdminQueueDeliverable] = []
+
+
+class DesignAdminQueueResponse(BaseModel):
+    items: list[DesignAdminQueueSite]
     total: int

@@ -85,9 +85,9 @@ export default function DesignGfcQueue() {
                       <div key={d.kind} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: 'rgba(255,255,255,0.85)' }}>
                         <span style={{ width: 110, color: 'rgba(255,255,255,0.6)' }}>{KIND_LABEL[d.kind] || d.kind}</span>
                         <span style={{ textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.1em', color: d.status === 'approved' ? '#7fd1a8' : 'rgba(255,255,255,0.5)' }}>{d.status}</span>
-                        {d.fileUrl
-                          ? <a href={d.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#7aa2ff' }}>{d.fileName || d.fileUrl}</a>
-                          : <span style={{ color: 'rgba(255,255,255,0.7)' }}>{d.fileName || ''}</span>}
+                        {d.downloadUrl
+                          ? <a href={d.downloadUrl} target="_blank" rel="noreferrer" style={{ color: '#7aa2ff', wordBreak: 'break-all', overflowWrap: 'anywhere' }}>{d.fileName || 'Open document'}</a>
+                          : <span style={{ color: 'rgba(255,255,255,0.7)', wordBreak: 'break-all' }}>{d.fileName || ''}</span>}
                         {d.kind === 'boq' && d.estimatedAmount != null && (
                           <span style={{ fontFamily: 'monospace', color: '#7fd1a8' }}>₹{Number(d.estimatedAmount).toLocaleString('en-IN')}</span>
                         )}
@@ -98,7 +98,7 @@ export default function DesignGfcQueue() {
                     placeholder="Comments (visible to the design supervisor; required to send back)"
                     value={comments} onChange={(e) => setComments(e.target.value)}
                     style={{
-                      width: '100%', minHeight: 64, padding: 10, borderRadius: 8,
+                      width: '100%', boxSizing: 'border-box', minHeight: 64, padding: 10, borderRadius: 8,
                       border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.04)',
                       color: '#fff', fontSize: 12.5, resize: 'vertical', marginBottom: 10,
                     }}

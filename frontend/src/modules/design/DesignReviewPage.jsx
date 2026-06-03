@@ -7,7 +7,7 @@ import { ROUTES } from '../../router/routes.js';
 import { listMyTeam } from '../../services/api/adapters/httpAdapter.js';
 import {
   getDesignReview, allocateDesign, revokeDesignAllocation,
-  listDesignDelegationsForSite, submitDeliverable, reviewDeliverable,
+  listDesignDelegationsForSite, submitDeliverable, uploadDeliverable, reviewDeliverable,
 } from '../../services/api/designApi.js';
 
 const KINDS = ['recce', '2d', '3d', 'boq'];
@@ -39,68 +39,99 @@ const btn = (bg) => ({
   display: 'inline-flex', alignItems: 'center', gap: 6,
 });
 const input = {
-  height: 32, padding: '0 10px', borderRadius: 7,
+  height: 32, padding: '0 10px', borderRadius: 7, boxSizing: 'border-box', maxWidth: '100%',
   border: '1px solid var(--zm-line)', background: 'var(--zm-surface)',
   color: 'var(--zm-fg)', fontFamily: 'var(--zm-font-body)', fontSize: 12.5, width: '100%',
 };
 
-function DeliverableCard({ kind, deliverable, isActive, isExecutive, isSupervisor, canSelfUpload, busy, onSubmit, onReview }) {
+function CommentBlock({ who, text, danger }) {
+  return (
+    <div style={{
+      fontFamily: 'var(--zm-font-body)', fontSize: 12, color: 'var(--zm-fg-2)',
+      background: 'var(--zm-surface-2)', borderRadius: 7, padding: '8px 10px', margin: '6px 0',
+      borderLeft: `2px solid ${danger ? 'var(--zm-danger)' : 'var(--zm-success)'}`,
+      wordBreak: 'break-word', overflowWrap: 'anywhere',
+    }}>
+      <strong>{who}:</strong> {text}
+    </div>
+  );
+}
+
+function DeliverableCard({ kind, deliverable, isActive, isExecutive, isSupervisor, canSelfUpload, busy, onSubmit, onUpload, onReview }) {
   const status = deliverable?.status || 'pending';
+  const adminStatus = deliverable?.adminStatus || 'pending';
   const tone = DELIV_TONE[status] || DELIV_TONE.pending;
-  const [fileUrl, setFileUrl] = React.useState('');
-  const [fileName, setFileName] = React.useState('');
+  const isBoq = kind === 'boq';
+  const needsAdmin = kind === '2d' || kind === '3d';
+  const [file, setFile] = React.useState(null);
   const [amount, setAmount] = React.useState('');
   const [comments, setComments] = React.useState('');
 
   const canUpload = (isExecutive || canSelfUpload) && isActive && status !== 'approved';
   const canReview = isSupervisor && isActive && status === 'submitted';
+  const awaitingAdmin = needsAdmin && status === 'approved' && adminStatus !== 'approved';
   const dim = !isActive && status === 'pending';
 
   return (
     <div className="zm-glass" style={{
-      borderRadius: 12, padding: 16, opacity: dim ? 0.55 : 1,
+      borderRadius: 12, padding: 16, opacity: dim ? 0.55 : 1, minWidth: 0,
       border: isActive ? '1px solid var(--zm-accent-line)' : '1px solid var(--zm-line)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
         <span style={{ fontFamily: 'var(--zm-font-mono)', fontSize: 11, color: 'var(--zm-fg-3)' }}>{KIND_NUM[kind]}</span>
         <strong style={{ fontFamily: 'var(--zm-font-body)', fontSize: 14, color: 'var(--zm-fg)' }}>{KIND_LABEL[kind]}</strong>
         {isActive && <Badge label="Active" color="var(--zm-accent)"/>}
-        <span style={{ marginLeft: 'auto' }}><Badge label={tone.label} color={tone.color}/></span>
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6, flexShrink: 0 }}>
+          {awaitingAdmin && <Badge label="Awaiting admin" color="var(--zm-copper)"/>}
+          <Badge label={tone.label} color={tone.color}/>
+        </span>
       </div>
 
-      {(deliverable?.fileName || deliverable?.fileUrl) && (
-        <div style={{ fontFamily: 'var(--zm-font-body)', fontSize: 12.5, color: 'var(--zm-fg-2)', marginBottom: 6 }}>
-          <Icon name="file" size={12}/>{' '}
-          {deliverable.fileUrl
-            ? <a href={deliverable.fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--zm-accent)' }}>{deliverable.fileName || deliverable.fileUrl}</a>
-            : <span>{deliverable.fileName}</span>}
+      {(deliverable?.fileName || deliverable?.downloadUrl) && (
+        <div style={{ fontSize: 12.5, color: 'var(--zm-fg-2)', marginBottom: 6, display: 'flex', alignItems: 'flex-start', gap: 6, minWidth: 0 }}>
+          <span style={{ flexShrink: 0, marginTop: 2 }}><Icon name="file" size={12}/></span>
+          {deliverable.downloadUrl
+            ? <a href={deliverable.downloadUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--zm-accent)', wordBreak: 'break-all', overflowWrap: 'anywhere' }}>{deliverable.fileName || 'Open document'}</a>
+            : <span style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>{deliverable.fileName}</span>}
         </div>
       )}
-      {kind === 'boq' && deliverable?.estimatedAmount != null && (
+      {isBoq && deliverable?.estimatedAmount != null && (
         <div style={{ fontFamily: 'var(--zm-font-mono)', fontSize: 13, color: 'var(--zm-fg)', marginBottom: 6 }}>
           Estimate: ₹{Number(deliverable.estimatedAmount).toLocaleString('en-IN')}
         </div>
       )}
-      {deliverable?.supervisorComments && (
-        <div style={{
-          fontFamily: 'var(--zm-font-body)', fontSize: 12, color: 'var(--zm-fg-2)',
-          background: 'var(--zm-surface-2)', borderRadius: 7, padding: '8px 10px', margin: '6px 0',
-          borderLeft: `2px solid ${status === 'rejected' ? 'var(--zm-danger)' : 'var(--zm-success)'}`,
-        }}>
-          <strong>Supervisor:</strong> {deliverable.supervisorComments}
-        </div>
+      {deliverable?.supervisorComments && <CommentBlock who="Supervisor" text={deliverable.supervisorComments} danger={status === 'rejected'}/>}
+      {deliverable?.adminComments && <CommentBlock who="Admin" text={deliverable.adminComments} danger={status === 'rejected'}/>}
+
+      {awaitingAdmin && (
+        <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--zm-fg-3)', lineHeight: 1.5 }}>
+          Approved by the supervisor — waiting for the business-admin's approval before the next stage.
+        </p>
       )}
 
       {canUpload && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
-          <input style={input} placeholder="File link (URL)" value={fileUrl} onChange={(e) => setFileUrl(e.target.value)}/>
-          <input style={input} placeholder="File name (e.g. recce.pdf)" value={fileName} onChange={(e) => setFileName(e.target.value)}/>
-          {kind === 'boq' && (
+          {isBoq ? (
             <input style={input} type="number" placeholder="Estimated amount (₹)" value={amount} onChange={(e) => setAmount(e.target.value)}/>
+          ) : (
+            <input
+              type="file"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              style={{ ...input, height: 'auto', padding: '7px 10px', cursor: 'pointer' }}
+            />
           )}
-          <button type="button" disabled={busy} style={{ ...btn('var(--zm-accent)'), alignSelf: 'flex-start', opacity: busy ? 0.6 : 1 }}
-            onClick={() => onSubmit(kind, { fileUrl, fileName, estimatedAmount: amount })}>
-            {status === 'rejected' ? 'Re-upload' : canSelfUpload ? 'Upload & approve' : 'Submit for review'}<Icon name="arrow-right" size={12}/>
+          <button
+            type="button"
+            disabled={busy || (!isBoq && !file)}
+            style={{ ...btn('var(--zm-accent)'), alignSelf: 'flex-start', opacity: (busy || (!isBoq && !file)) ? 0.6 : 1 }}
+            onClick={() => (isBoq ? onSubmit(kind, { estimatedAmount: amount }) : onUpload(kind, file))}
+          >
+            {status === 'rejected'
+              ? (isBoq ? 'Re-submit' : 'Re-upload')
+              : isBoq
+                ? (canSelfUpload ? 'Submit & approve' : 'Submit for review')
+                : (canSelfUpload ? 'Upload & approve' : 'Upload & submit')}
+            <Icon name="arrow-right" size={12}/>
           </button>
         </div>
       )}
@@ -195,6 +226,14 @@ export default function DesignReviewPage() {
     finally { setBusy(false); }
   };
 
+  const onUpload = async (kind, file) => {
+    if (!file) return;
+    setBusy(true);
+    try { const r = await uploadDeliverable(siteId, kind, file); setReview(r); }
+    catch (err) { window.alert(err?.detail || err?.message || 'Upload failed'); }
+    finally { setBusy(false); }
+  };
+
   const onReview = async (kind, payload) => {
     if (payload.decision === 'reject' && !payload.comments?.trim()) {
       window.alert('Comments are required to send a deliverable back.'); return;
@@ -284,6 +323,7 @@ export default function DesignReviewPage() {
             canSelfUpload={isSupervisor && !allocation}
             busy={busy}
             onSubmit={onSubmit}
+            onUpload={onUpload}
             onReview={onReview}
           />
         ))}

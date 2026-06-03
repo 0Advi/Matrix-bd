@@ -7,7 +7,8 @@ import { useSession } from '../../../state/SessionContext.jsx';
 export default function TopBar({ user, role, dark, onToggleDark, onNewPipeline, onSearch, sidebarCollapsed = false, onToggleSidebar }) {
   const { signOut, session } = useSession();
   // BD-only action — legal and payment supervisors don't open pipeline drafts.
-  const showNewPipeline = session?.module !== 'legal' && session?.module !== 'payment';
+  // "New pipeline" creates a BD site draft — only the BD surface (or mock/no-module) shows it.
+  const showNewPipeline = !session?.module || session?.module === 'bd';
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
