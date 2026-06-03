@@ -5,6 +5,7 @@ const MODULES = [
   { key: 'bd',      label: 'BD' },
   { key: 'legal',   label: 'Legal' },
   { key: 'payment', label: 'Payment' },
+  { key: 'design',  label: 'Design' },
   { key: 'recce',   label: 'Recce' },
   { key: 'project', label: 'Project' },
 ];

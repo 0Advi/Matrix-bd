@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict
 
 Module = Literal["bd", "legal", "payment", "design", "recce", "project"]
 
@@ -20,7 +20,7 @@ class InviteCodeOut(BaseModel):
 class PendingExecOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
-    email: EmailStr
+    email: str
     module: Module
     created_at: datetime
 
@@ -28,7 +28,7 @@ class PendingExecOut(BaseModel):
 class TeamMemberOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
-    email: EmailStr
+    email: str
     name: str | None = None
     module: Module
     joined_at: datetime
