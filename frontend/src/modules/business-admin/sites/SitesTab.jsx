@@ -59,7 +59,7 @@ function Pipeline({ site }) {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, width: 52 }}>
               <span className="ac-node" style={{ width: 11, height: 11, borderRadius: 999, background: c.dot,
                 boxShadow: c.ring !== 'transparent' ? `0 0 0 4px ${c.ring}` : 'none',
-                border: tone === 'pending' ? `1px solid rgba(255,255,255,0.25)` : 'none' }} />
+                border: tone === 'pending' ? `1px solid ${T.lineStrong}` : 'none' }} />
               <span style={{ fontSize: 9.5, letterSpacing: '0.02em', color: tone === 'pending' ? T.textFaint : T.textMuted,
                 whiteSpace: 'nowrap' }}>{n.label}</span>
             </div>
@@ -105,14 +105,14 @@ function HistoryDrawer({ site, fetchHistory, onClose }) {
         <Icon.clock size={14} /> Full history</span>}>
 
       <div role="tablist" style={{ display: 'flex', gap: 4, padding: 4, marginBottom: 18, flexWrap: 'wrap',
-        background: 'rgba(255,255,255,0.05)', border: `1px solid ${T.line}`, borderRadius: T.radiusPill }}>
+        background: T.chip, border: `1px solid ${T.line}`, borderRadius: T.radiusPill }}>
         {FILTERS.map(({ key, label }) => {
           const active = mod === key; const n = counts[key] || 0;
           return (
             <button key={key} onClick={() => setMod(key)} className={`ac-tab${active ? ' is-active' : ''}`}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 11px', borderRadius: 999,
                 border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 650,
-                background: active ? '#F4F5F7' : 'transparent', color: active ? '#0B0C10' : T.textMuted }}>
+                background: active ? T.invBg : 'transparent', color: active ? T.invText : T.textMuted }}>
               {label}<span style={{ ...TABULAR, fontSize: 10.5, opacity: 0.8 }}>{n}</span>
             </button>
           );
@@ -138,7 +138,7 @@ function HistoryDrawer({ site, fetchHistory, onClose }) {
               return (
                 <div key={e.id} style={{ position: 'relative', display: 'flex', gap: 14, padding: '9px 0 9px 0' }}>
                   <span style={{ width: 12, height: 12, borderRadius: 999, background: dotColor(e.action), marginLeft: 5, marginTop: 3,
-                    flexShrink: 0, boxShadow: `0 0 0 4px #0E0F15`, zIndex: 1 }} />
+                    flexShrink: 0, boxShadow: `0 0 0 4px ${T.drawerBg}`, zIndex: 1 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',

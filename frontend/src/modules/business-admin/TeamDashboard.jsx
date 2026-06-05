@@ -14,7 +14,7 @@ import {
   rotateDeptCode, listPendingSupervisors, approveSupervisor, rejectSupervisor,
 } from '../../services/api/adapters/httpAdapter.js';
 
-import { T, Icon, Button, IconButton, StatTile, SegmentedNav, TABULAR } from './ui/kit.jsx';
+import { T, Icon, Button, IconButton, StatTile, SegmentedNav, ThemeToggle, TABULAR, getInitialTheme, persistTheme } from './ui/kit.jsx';
 import ApprovalCenter from './approval/ApprovalCenter.jsx';
 import DepartmentsTab from './departments/DepartmentsTab.jsx';
 import SitesTab from './sites/SitesTab.jsx';
@@ -74,6 +74,8 @@ export default function TeamDashboard({ onLogout, fetchers = REAL_FETCHERS, work
 
   const [tab, setTab] = React.useState('approvals');
   const [refreshingAll, setRefreshingAll] = React.useState(false);
+  const [theme, setTheme] = React.useState(getInitialTheme);
+  const toggleTheme = () => setTheme((t) => { const next = t === 'dark' ? 'light' : 'dark'; persistTheme(next); return next; });
 
   // Approval queues (aggregated by site below)
   const [deliverables, loadDeliverables] = useQueue(fetchers.listDeliverables);
@@ -120,6 +122,7 @@ export default function TeamDashboard({ onLogout, fetchers = REAL_FETCHERS, work
   const paymentSites = approvalSites.filter((s) => s.payment).length;
   const supCount = supervisors.items.length;
   const sitesCount = sites.items.length;
+  const completedSites = (sites.items || []).filter((s) => s.projectStatus === 'done' || s.projectStatus === 'completed').length;
 
   // ── handlers ──
   const handlers = {
@@ -144,7 +147,7 @@ export default function TeamDashboard({ onLogout, fetchers = REAL_FETCHERS, work
   };
 
   return (
-    <div className="ac-root" style={{ minHeight: '100vh', maxHeight: '100vh', overflowY: 'auto', background: T.bg, color: T.text }}>
+    <div className="ac-root" data-theme={theme} style={{ minHeight: '100vh', maxHeight: '100vh', overflowY: 'auto', background: T.bg, color: T.text }}>
       <div style={{ maxWidth: 1120, margin: '0 auto', padding: '32px 28px 72px' }}>
 
         {/* ── Header ── */}
@@ -156,6 +159,7 @@ export default function TeamDashboard({ onLogout, fetchers = REAL_FETCHERS, work
           </div>
           <span style={{ flex: 1 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
             <IconButton label="Refresh all" loading={refreshingAll} onClick={refreshAll}><Icon.refresh size={16} /></IconButton>
             <Button variant="ghost" size="md" icon={<Icon.signout size={15} />} onClick={onLogout}>Sign out</Button>
           </div>
@@ -175,15 +179,16 @@ export default function TeamDashboard({ onLogout, fetchers = REAL_FETCHERS, work
         </div>
 
         {/* ── Overview tiles ── */}
-        <div className="ac-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
-          <StatTile icon={Icon.check} label="Sites awaiting approval" count={approvalSites.length} tone="warn"
+        <div className="ac-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(212px, 1fr))', gap: 14, marginBottom: 24 }}>
+          <StatTile icon={Icon.pin} label="Total sites" count={sitesCount} tone="neutral"
+            loading={sites.status === 'loading'} caption="in the system" onClick={() => setTab('sites')} />
+          <StatTile icon={Icon.check} label="Awaiting approval" count={approvalSites.length} tone="warn"
             loading={approvalStatus === 'loading'} caption={approvalSites.length ? `${designSites} design · ${paymentSites} payment` : 'all clear'}
             onClick={() => setTab('approvals')} />
-          <StatTile icon={Icon.users} label="Pending supervisors" count={supCount} tone="warn"
-            loading={supervisors.status === 'loading'} caption={supCount ? 'awaiting approval' : 'all clear'}
-            onClick={() => setTab('departments')} />
-          <StatTile icon={Icon.pin} label="Sites in system" count={sitesCount} tone="neutral"
-            loading={sites.status === 'loading'} caption="view pipeline & history" onClick={() => setTab('sites')} />
+          <StatTile icon={Icon.flag} label="Completed sites" count={completedSites} tone="success"
+            loading={sites.status === 'loading'} caption={completedSites ? 'project done' : 'none yet'} onClick={() => setTab('sites')} />
+          <StatTile icon={Icon.users} label="Pending requests" count={supCount} tone="accent"
+            loading={supervisors.status === 'loading'} caption="workspace access" onClick={() => setTab('departments')} />
         </div>
 
         {/* ── Tabs ── */}

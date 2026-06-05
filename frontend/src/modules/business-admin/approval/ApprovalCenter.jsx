@@ -18,8 +18,8 @@ const designCount = (s) => (s.design?.deliverables?.length || 0) + (s.design?.gf
 const hasType = (s, t) => (t === 'design' ? designCount(s) > 0 : t === 'payment' ? !!s.payment : t === 'project' ? !!s.project : true);
 
 function Chip({ icon: CIcon, label, tone }) {
-  const tones = { design: [T.accentSoft, T.accentText], payment: [T.warnSoft, T.warnText], project: ['rgba(160,120,220,0.16)', '#C9A6F2'] };
-  const [bg, fg] = tones[tone] || ['rgba(255,255,255,0.07)', T.textMuted];
+  const tones = { design: [T.accentSoft, T.accentText], payment: [T.warnSoft, T.warnText], project: [T.projectSoft, T.projectText] };
+  const [bg, fg] = tones[tone] || [T.chip, T.textMuted];
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 9px', borderRadius: 999,
       fontSize: 11.5, fontWeight: 650, background: bg, color: fg }}>
@@ -50,7 +50,7 @@ export default function ApprovalCenter({ data, handlers, onRetry }) {
     <div>
       {/* filters */}
       <div role="tablist" style={{ display: 'inline-flex', gap: 4, padding: 4, marginBottom: 18, flexWrap: 'wrap',
-        background: 'rgba(255,255,255,0.05)', border: `1px solid ${T.line}`, borderRadius: T.radiusPill }}>
+        background: T.chip, border: `1px solid ${T.line}`, borderRadius: T.radiusPill }}>
         {TYPE_FILTERS.map(({ key, label, icon: FIcon }) => {
           const isActive = filter === key;
           const n = counts[key] || 0;
@@ -59,12 +59,12 @@ export default function ApprovalCenter({ data, handlers, onRetry }) {
               className={`ac-tab${isActive ? ' is-active' : ''}`}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 32, padding: '0 14px',
                 borderRadius: T.radiusPill, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 650,
-                background: isActive ? '#F4F5F7' : 'transparent', color: isActive ? '#0B0C10' : T.textMuted }}>
+                background: isActive ? T.invBg : 'transparent', color: isActive ? T.invText : T.textMuted }}>
               {FIcon && <FIcon size={14} />}{label}
               <span style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 999, fontSize: 10.5, fontWeight: 700,
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', ...TABULAR,
-                background: isActive ? 'rgba(11,12,16,0.12)' : (n > 0 ? T.warnSoft : 'rgba(255,255,255,0.08)'),
-                color: isActive ? '#0B0C10' : (n > 0 ? T.warnText : T.textFaint) }}>{n}</span>
+                background: isActive ? T.invSoft : (n > 0 ? T.warnSoft : T.chip),
+                color: isActive ? T.invText : (n > 0 ? T.warnText : T.textFaint) }}>{n}</span>
             </button>
           );
         })}

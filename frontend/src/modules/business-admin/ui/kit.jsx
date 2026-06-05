@@ -10,33 +10,49 @@ import React from 'react';
 // motion) live in ../approval-center.css; everything here is layout + colour.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Tokens resolve to CSS custom properties defined per-theme in
+// ../approval-center.css ([data-theme="dark"] / [data-theme="light"]). Same token
+// names in both themes means components never hardcode a colour — light/dark is a
+// pure data-theme swap on the portal root, with contrast tuned in both.
 export const T = {
-  bg:            '#0B0C10',
-  surface:       'rgba(255,255,255,0.035)',
-  surfaceRaised: '#13141B',
-  surfaceInset:  'rgba(0,0,0,0.35)',
-  line:          'rgba(255,255,255,0.10)',
-  lineStrong:    'rgba(255,255,255,0.16)',
+  bg:            'var(--ac-bg)',
+  surface:       'var(--ac-surface)',
+  surfaceRaised: 'var(--ac-surface-raised)',
+  surfaceInset:  'var(--ac-surface-inset)',
+  line:          'var(--ac-line)',
+  lineStrong:    'var(--ac-line-strong)',
+  chip:          'var(--ac-chip)',        // subtle neutral fill (icon chips, ghost buttons)
 
-  text:      '#F4F5F7',
-  textMuted: 'rgba(255,255,255,0.64)',
-  textFaint: 'rgba(255,255,255,0.42)',
+  text:      'var(--ac-text)',
+  textMuted: 'var(--ac-text-muted)',
+  textFaint: 'var(--ac-text-faint)',
 
-  accent:     '#3B6EF0',
-  accentText: '#8FB0FF',
-  accentSoft: 'rgba(59,110,240,0.16)',
+  // Inverted surface — near-white on dark, near-black on light (solid buttons / active pills).
+  invBg:   'var(--ac-inv-bg)',
+  invText: 'var(--ac-inv-text)',
+  invSoft: 'var(--ac-inv-soft)',          // subtle fill that reads on the inverted surface
 
-  success:     '#2FA160',
-  successText: '#7FD1A8',
-  successSoft: 'rgba(47,161,96,0.15)',
+  drawerBg: 'var(--ac-drawer-bg)',
 
-  danger:     '#C0413F',
-  dangerText: '#F4A6A4',
-  dangerSoft: 'rgba(192,65,63,0.16)',
+  accent:     'var(--ac-accent)',
+  accentText: 'var(--ac-accent-text)',
+  accentSoft: 'var(--ac-accent-soft)',
 
-  warn:     '#E0A23C',
-  warnText: '#F2C879',
-  warnSoft: 'rgba(224,162,60,0.15)',
+  success:     'var(--ac-success)',
+  successText: 'var(--ac-success-text)',
+  successSoft: 'var(--ac-success-soft)',
+
+  danger:     'var(--ac-danger)',
+  dangerText: 'var(--ac-danger-text)',
+  dangerSoft: 'var(--ac-danger-soft)',
+
+  warn:     'var(--ac-warn)',
+  warnText: 'var(--ac-warn-text)',
+  warnSoft: 'var(--ac-warn-soft)',
+
+  project:     'var(--ac-project)',       // purple — project / budget category
+  projectText: 'var(--ac-project-text)',
+  projectSoft: 'var(--ac-project-soft)',
 
   mono: 'ui-monospace, SFMono-Regular, Menlo, monospace',
 
@@ -44,6 +60,24 @@ export const T = {
   radiusSm:   10,
   radiusPill: 999,
 };
+
+// ── Theme: read / persist / toggle the data-theme on the portal root ──────────
+export const THEME_KEY = 'ac-theme';
+
+export function getInitialTheme() {
+  if (typeof window === 'undefined') return 'dark';
+  try {
+    const saved = window.localStorage.getItem(THEME_KEY);
+    if (saved === 'light' || saved === 'dark') return saved;
+  } catch { /* ignore */ }
+  try {
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  } catch { return 'dark'; }
+}
+
+export function persistTheme(theme) {
+  try { window.localStorage.setItem(THEME_KEY, theme); } catch { /* ignore */ }
+}
 
 export const TABULAR = { fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum"' };
 
@@ -84,6 +118,8 @@ export const Icon = {
   pin:     (p) => <Svg {...p}><path d="M12 21s-6-5.2-6-10a6 6 0 0 1 12 0c0 4.8-6 10-6 10Z"/><circle cx="12" cy="11" r="2.2"/></Svg>,
   scale:   (p) => <Svg {...p}><path d="M12 4v16M7 20h10"/><path d="M5 8h14l-3 5a3 3 0 0 1-8 0L5 8Z"/></Svg>,
   flag:    (p) => <Svg {...p}><path d="M5 21V4"/><path d="M5 4h11l-1.6 3.5L16 11H5"/></Svg>,
+  sun:     (p) => <Svg {...p}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></Svg>,
+  moon:    (p) => <Svg {...p}><path d="M20 13.5A8 8 0 1 1 10.5 4a6.5 6.5 0 0 0 9.5 9.5Z"/></Svg>,
 };
 
 export const inr = (n) => (n == null ? '—' : `₹${Number(n).toLocaleString('en-IN')}`);
@@ -124,12 +160,12 @@ export function Card({ as: Tag = 'div', interactive = false, raised = false, sty
 // ── Button ────────────────────────────────────────────────────────────────────
 
 const BTN_VARIANTS = {
-  solid:   { background: '#F4F5F7', color: '#0B0C10', border: '1px solid transparent' },
+  solid:   { background: T.invBg, color: T.invText, border: '1px solid transparent' },
   success: { background: T.success, color: '#fff', border: '1px solid transparent' },
   danger:  { background: T.danger,  color: '#fff', border: '1px solid transparent' },
   accent:  { background: T.accent,  color: '#fff', border: '1px solid transparent' },
-  ghost:   { background: 'rgba(255,255,255,0.05)', color: T.text, border: `1px solid ${T.lineStrong}` },
-  subtle:  { background: 'rgba(255,255,255,0.05)', color: T.text, border: '1px solid transparent' },
+  ghost:   { background: T.chip, color: T.text, border: `1px solid ${T.lineStrong}` },
+  subtle:  { background: T.chip, color: T.text, border: '1px solid transparent' },
 };
 const BTN_SIZES = {
   sm: { height: 30, padding: '0 12px', fontSize: 12.5, borderRadius: 9 },
@@ -158,7 +194,7 @@ export function IconButton({ label, loading = false, size = 32, children, style,
       title={label}
       style={{
         width: size, height: size, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        borderRadius: 9, border: `1px solid ${T.lineStrong}`, background: 'rgba(255,255,255,0.05)',
+        borderRadius: 9, border: `1px solid ${T.lineStrong}`, background: T.chip,
         color: T.textMuted, cursor: 'pointer', ...style,
       }}
       {...rest}
@@ -183,7 +219,7 @@ function Spinner({ size = 14 }) {
 export function CountBadge({ count, tone = 'neutral' }) {
   const active = count > 0;
   const tones = {
-    neutral: { bg: 'rgba(255,255,255,0.10)', fg: T.textMuted },
+    neutral: { bg: T.chip, fg: T.textMuted },
     warn:    { bg: T.warnSoft,    fg: T.warnText },
     accent:  { bg: T.accentSoft,  fg: T.accentText },
     success: { bg: T.successSoft, fg: T.successText },
@@ -223,33 +259,34 @@ export function StatTile({ icon: TileIcon, label, count, caption, tone = 'accent
     accent:  { fg: T.accentText,  chip: T.accentSoft },
     warn:    { fg: T.warnText,    chip: T.warnSoft },
     success: { fg: T.successText, chip: T.successSoft },
-    neutral: { fg: T.text,        chip: 'rgba(255,255,255,0.08)' },
+    neutral: { fg: T.text,        chip: T.chip },
   };
   const c = tones[tone] || tones.accent;
   return (
     <Card
       as="button"
       interactive
+      raised
       onClick={onClick}
       style={{
-        textAlign: 'left', padding: 16, display: 'flex', flexDirection: 'column', gap: 12,
-        background: T.surfaceRaised, cursor: 'pointer', minWidth: 0,
+        textAlign: 'left', padding: 20, display: 'flex', flexDirection: 'column', gap: 16,
+        cursor: 'pointer', minWidth: 0,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{ width: 34, height: 34, borderRadius: 10, display: 'inline-flex', alignItems: 'center',
-          justifyContent: 'center', background: c.chip, color: active ? c.fg : T.textMuted }}>
-          <TileIcon size={18} />
+        <span style={{ width: 42, height: 42, borderRadius: 12, display: 'inline-flex', alignItems: 'center',
+          justifyContent: 'center', background: c.chip, color: c.fg }}>
+          <TileIcon size={21} />
         </span>
-        <Icon.chevron size={16} style={{ color: T.textFaint }} />
+        <Icon.chevron size={17} style={{ color: T.textFaint }} />
       </div>
       <div>
         {loading
-          ? <div className="ac-skel" style={{ width: 40, height: 30, borderRadius: 8 }} />
-          : <div style={{ fontSize: 30, lineHeight: 1, fontWeight: 750, letterSpacing: '-0.02em',
+          ? <div className="ac-skel" style={{ width: 52, height: 40, borderRadius: 8 }} />
+          : <div style={{ fontSize: 40, lineHeight: 1, fontWeight: 760, letterSpacing: '-0.03em',
               color: active ? c.fg : T.textFaint, ...TABULAR }}>{count}</div>}
-        <div style={{ marginTop: 7, fontSize: 13, fontWeight: 600, color: T.text }}>{label}</div>
-        <div style={{ marginTop: 2, fontSize: 11.5, color: T.textFaint }}>{loading ? '—' : caption}</div>
+        <div style={{ marginTop: 9, fontSize: 14, fontWeight: 650, color: T.text }}>{label}</div>
+        <div style={{ marginTop: 3, fontSize: 12, color: T.textFaint }}>{loading ? '—' : caption}</div>
       </div>
     </Card>
   );
@@ -261,7 +298,7 @@ export function SegmentedNav({ tabs, active, onChange }) {
   return (
     <div role="tablist" style={{
       display: 'inline-flex', gap: 4, padding: 4, borderRadius: T.radiusPill,
-      background: 'rgba(255,255,255,0.05)', border: `1px solid ${T.line}`, maxWidth: '100%', overflowX: 'auto',
+      background: T.chip, border: `1px solid ${T.line}`, maxWidth: '100%', overflowX: 'auto',
     }}>
       {tabs.map((t) => {
         const isActive = active === t.key;
@@ -277,8 +314,8 @@ export function SegmentedNav({ tabs, active, onChange }) {
               display: 'inline-flex', alignItems: 'center', gap: 8, height: 34, padding: '0 14px',
               borderRadius: T.radiusPill, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
               fontSize: 13, fontWeight: 650,
-              background: isActive ? '#F4F5F7' : 'transparent',
-              color: isActive ? '#0B0C10' : T.textMuted,
+              background: isActive ? T.invBg : 'transparent',
+              color: isActive ? T.invText : T.textMuted,
             }}
           >
             {TabIcon && <TabIcon size={16} />}
@@ -287,8 +324,8 @@ export function SegmentedNav({ tabs, active, onChange }) {
               <span style={{
                 minWidth: 19, height: 19, padding: '0 6px', borderRadius: 999, display: 'inline-flex',
                 alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, ...TABULAR,
-                background: isActive ? 'rgba(11,12,16,0.12)' : (t.count > 0 ? T.warnSoft : 'rgba(255,255,255,0.10)'),
-                color: isActive ? '#0B0C10' : (t.count > 0 ? T.warnText : T.textFaint),
+                background: isActive ? T.invSoft : (t.count > 0 ? T.warnSoft : T.chip),
+                color: isActive ? T.invText : (t.count > 0 ? T.warnText : T.textFaint),
               }}>{t.count}</span>
             )}
           </button>
@@ -305,7 +342,7 @@ export function SectionHeader({ icon: HeadIcon, title, description, count, tone 
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
       {HeadIcon && (
         <span style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, display: 'inline-flex',
-          alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.06)', color: T.textMuted }}>
+          alignItems: 'center', justifyContent: 'center', background: T.chip, color: T.textMuted }}>
           <HeadIcon size={19} />
         </span>
       )}
@@ -336,7 +373,7 @@ export function EmptyState({ icon: EmptyIcon = Icon.inbox, title, hint }) {
   return (
     <Card style={{ padding: '36px 24px', textAlign: 'center', borderStyle: 'dashed' }}>
       <span style={{ width: 46, height: 46, borderRadius: 12, display: 'inline-flex', alignItems: 'center',
-        justifyContent: 'center', background: 'rgba(255,255,255,0.05)', color: T.textMuted, marginBottom: 12 }}>
+        justifyContent: 'center', background: T.chip, color: T.textMuted, marginBottom: 12 }}>
         <EmptyIcon size={22} />
       </span>
       <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{title}</div>
@@ -352,7 +389,7 @@ export function ErrorState({ message, onRetry, retrying }) {
         <span style={{ color: T.dangerText, flexShrink: 0, marginTop: 1 }}><Icon.alert size={18} /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: T.dangerText }}>Couldn’t load</div>
-          <div style={{ marginTop: 3, fontSize: 12.5, color: 'rgba(255,255,255,0.78)', lineHeight: 1.5, wordBreak: 'break-word' }}>{message}</div>
+          <div style={{ marginTop: 3, fontSize: 12.5, color: T.textMuted, lineHeight: 1.5, wordBreak: 'break-word' }}>{message}</div>
         </div>
         {onRetry && (
           <Button variant="ghost" size="sm" loading={retrying} onClick={onRetry} icon={<Icon.refresh size={14} />}>
@@ -376,7 +413,7 @@ export function Drawer({ open, onClose, title, subtitle, headerRight, children, 
   if (!open) return null;
   return (
     <div className="ac-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
-      <div className="ac-drawer ac-root" role="dialog" aria-modal="true" style={{ '--ac-accent': T.accent }}>
+      <div className="ac-drawer" role="dialog" aria-modal="true">
         <div style={{ padding: '18px 22px', borderBottom: `1px solid ${T.line}`, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             {subtitle && <div style={{ fontSize: 11.5, letterSpacing: '0.04em', color: T.textMuted, marginBottom: 3 }}>{subtitle}</div>}
@@ -386,7 +423,7 @@ export function Drawer({ open, onClose, title, subtitle, headerRight, children, 
           <IconButton label="Close" onClick={onClose}><Icon.x size={16} /></IconButton>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: 22 }}>{children}</div>
-        {footer && <div style={{ padding: '14px 22px', borderTop: `1px solid ${T.line}`, background: 'rgba(0,0,0,0.2)' }}>{footer}</div>}
+        {footer && <div style={{ padding: '14px 22px', borderTop: `1px solid ${T.line}`, background: T.chip }}>{footer}</div>}
       </div>
     </div>
   );
@@ -410,5 +447,16 @@ export function Disclosure({ header, children, defaultOpen = false, count }) {
       </button>
       {open && <div className="ac-fade-in" style={{ padding: '4px 14px 14px 34px' }}>{children}</div>}
     </div>
+  );
+}
+
+// ── Theme toggle ─────────────────────────────────────────────────────────────
+
+export function ThemeToggle({ theme, onToggle }) {
+  const isDark = theme === 'dark';
+  return (
+    <IconButton label={isDark ? 'Switch to light mode' : 'Switch to dark mode'} onClick={onToggle}>
+      {isDark ? <Icon.sun size={16} /> : <Icon.moon size={16} />}
+    </IconButton>
   );
 }

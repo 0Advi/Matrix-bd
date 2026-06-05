@@ -26,7 +26,7 @@ function Person({ p, role }) {
       </div>
       {role && (
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: T.textMuted,
-          padding: '2px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', border: `1px solid ${T.line}` }}>{role}</span>
+          padding: '2px 8px', borderRadius: 999, background: T.chip, border: `1px solid ${T.line}` }}>{role}</span>
       )}
     </div>
   );
@@ -51,7 +51,7 @@ export default function OrgModuleCard({ mod, onRotate, loading }) {
     <Card raised style={{ padding: 18 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <span style={{ width: 34, height: 34, borderRadius: 9, display: 'inline-flex', alignItems: 'center',
-          justifyContent: 'center', background: 'rgba(255,255,255,0.06)', color: T.textMuted }}><MetaIcon size={18} /></span>
+          justifyContent: 'center', background: T.chip, color: T.textMuted }}><MetaIcon size={18} /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14.5, fontWeight: 700, color: T.text }}>{meta.label}</div>
           <div style={{ fontSize: 11.5, color: T.textFaint }}>

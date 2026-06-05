@@ -8,12 +8,12 @@ import { T, Icon, Card, Button, StatusPill, Skeleton, inr, TABULAR } from '../ui
 const KIND_LABEL = { recce: 'Recce', '2d': '2D design', '3d': '3D design', boq: 'BOQ + estimate' };
 
 function BlockShell({ icon: BIcon, tone, title, amount, children }) {
-  const tones = { design: T.accentText, payment: T.warnText, project: '#C9A6F2' };
+  const tones = { design: T.accentText, payment: T.warnText, project: T.projectText };
   return (
     <Card style={{ padding: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
         <span style={{ width: 30, height: 30, borderRadius: 8, display: 'inline-flex', alignItems: 'center',
-          justifyContent: 'center', background: 'rgba(255,255,255,0.06)', color: tones[tone] || T.textMuted }}>
+          justifyContent: 'center', background: T.chip, color: tones[tone] || T.textMuted }}>
           <BIcon size={16} />
         </span>
         <strong style={{ fontSize: 13.5, color: T.text }}>{title}</strong>

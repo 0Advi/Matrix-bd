@@ -43,7 +43,7 @@ export default function PendingSupervisorsList({ data, onApprove, onReject, onRe
   return (
     <div>
       <div role="tablist" style={{ display: 'inline-flex', gap: 4, padding: 4, marginBottom: 16,
-        background: 'rgba(255,255,255,0.05)', border: `1px solid ${T.line}`, borderRadius: T.radiusPill, flexWrap: 'wrap' }}>
+        background: T.chip, border: `1px solid ${T.line}`, borderRadius: T.radiusPill, flexWrap: 'wrap' }}>
         {FILTERS.map(({ key, label }) => {
           const isActive = filter === key;
           const n = counts[key] || 0;
@@ -52,12 +52,12 @@ export default function PendingSupervisorsList({ data, onApprove, onReject, onRe
               className={`ac-tab${isActive ? ' is-active' : ''}`}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 30, padding: '0 13px',
                 borderRadius: T.radiusPill, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 650,
-                background: isActive ? '#F4F5F7' : 'transparent', color: isActive ? '#0B0C10' : T.textMuted }}>
+                background: isActive ? T.invBg : 'transparent', color: isActive ? T.invText : T.textMuted }}>
               {label}
               <span style={{ minWidth: 17, height: 17, padding: '0 5px', borderRadius: 999, fontSize: 10.5, fontWeight: 700,
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', ...TABULAR,
-                background: isActive ? 'rgba(11,12,16,0.12)' : 'rgba(255,255,255,0.08)',
-                color: isActive ? '#0B0C10' : T.textFaint }}>{n}</span>
+                background: isActive ? T.invSoft : T.chip,
+                color: isActive ? T.invText : T.textFaint }}>{n}</span>
             </button>
           );
         })}
@@ -96,7 +96,7 @@ export default function PendingSupervisorsList({ data, onApprove, onReject, onRe
                 <span style={{ fontFamily: T.mono, fontSize: 12.5, color: T.text, overflow: 'hidden',
                   textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</span>
                 <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
-                  color: T.textMuted, padding: '3px 9px', borderRadius: 999, background: 'rgba(255,255,255,0.06)',
+                  color: T.textMuted, padding: '3px 9px', borderRadius: 999, background: T.chip,
                   border: `1px solid ${T.line}`, justifySelf: 'start' }}>{u.module}</span>
                 <span style={{ fontSize: 11.5, color: T.textFaint, fontFamily: T.mono, overflow: 'hidden',
                   textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.createdAt ? new Date(u.createdAt).toLocaleString() : '—'}</span>
