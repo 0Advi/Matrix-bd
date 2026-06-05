@@ -14,7 +14,8 @@ import {
   rotateDeptCode, listPendingSupervisors, approveSupervisor, rejectSupervisor,
 } from '../../services/api/adapters/httpAdapter.js';
 
-import { T, Icon, Button, IconButton, StatTile, SegmentedNav, ThemeToggle, TABULAR, getInitialTheme, persistTheme } from './ui/kit.jsx';
+import { T, Icon, IconButton, StatTile, TABULAR, getInitialTheme, persistTheme } from './ui/kit.jsx';
+import Sidebar from './ui/Sidebar.jsx';
 import ApprovalCenter from './approval/ApprovalCenter.jsx';
 import DepartmentsTab from './departments/DepartmentsTab.jsx';
 import SitesTab from './sites/SitesTab.jsx';
@@ -76,6 +77,14 @@ export default function TeamDashboard({ onLogout, fetchers = REAL_FETCHERS, work
   const [refreshingAll, setRefreshingAll] = React.useState(false);
   const [theme, setTheme] = React.useState(getInitialTheme);
   const toggleTheme = () => setTheme((t) => { const next = t === 'dark' ? 'light' : 'dark'; persistTheme(next); return next; });
+  const [navExpanded, setNavExpanded] = React.useState(() => {
+    try { return window.localStorage.getItem('ac-nav') !== 'collapsed'; } catch { return true; }
+  });
+  const toggleNav = () => setNavExpanded((v) => {
+    const next = !v;
+    try { window.localStorage.setItem('ac-nav', next ? 'expanded' : 'collapsed'); } catch { /* ignore */ }
+    return next;
+  });
 
   // Approval queues (aggregated by site below)
   const [deliverables, loadDeliverables] = useQueue(fetchers.listDeliverables);
@@ -146,24 +155,33 @@ export default function TeamDashboard({ onLogout, fetchers = REAL_FETCHERS, work
     finally { setRefreshingAll(false); }
   };
 
-  return (
-    <div className="ac-root" data-theme={theme} style={{ minHeight: '100vh', maxHeight: '100vh', overflowY: 'auto', background: T.bg, color: T.text }}>
-      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '32px 28px 72px' }}>
+  const navItems = [
+    { ...TABS[0], count: approvalSites.length },
+    { ...TABS[1], count: supCount },
+    { ...TABS[2] },
+  ];
 
-        {/* ── Header ── */}
-        <header style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', color: T.textMuted }}>Matrix · Business admin</div>
-            <h1 style={{ margin: '5px 0 0', fontSize: 27, fontWeight: 720, letterSpacing: '-0.025em', color: T.text }}>{company || 'Workspace'}</h1>
-            <div style={{ marginTop: 3, fontSize: 13, color: T.textMuted }}>Approval center</div>
-          </div>
-          <span style={{ flex: 1 }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ThemeToggle theme={theme} onToggle={toggleTheme} />
+  return (
+    <div className="ac-root" data-theme={theme}
+      style={{ height: '100vh', background: T.bg, color: T.text, display: 'flex', gap: 14, padding: 14, boxSizing: 'border-box' }}>
+      <Sidebar items={navItems} active={tab} onChange={setTab}
+        expanded={navExpanded} onToggleExpanded={toggleNav}
+        theme={theme} onToggleTheme={toggleTheme} onLogout={onLogout} />
+
+      <main style={{ flex: 1, minWidth: 0, height: '100%', overflowY: 'auto', borderRadius: 22,
+        background: T.panel, border: `1px solid ${T.line}`, boxShadow: T.cardShadow }}>
+        <div style={{ maxWidth: 1080, margin: '0 auto', padding: '30px 34px 60px' }}>
+
+          {/* ── Header ── */}
+          <header style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 22, flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', color: T.textMuted }}>Scale · Business admin</div>
+              <h1 style={{ margin: '5px 0 0', fontSize: 27, fontWeight: 730, letterSpacing: '-0.025em', color: T.text }}>{company || 'Workspace'}</h1>
+              <div style={{ marginTop: 3, fontSize: 13, color: T.textMuted }}>Approval center</div>
+            </div>
+            <span style={{ flex: 1 }} />
             <IconButton label="Refresh all" loading={refreshingAll} onClick={refreshAll}><Icon.refresh size={16} /></IconButton>
-            <Button variant="ghost" size="md" icon={<Icon.signout size={15} />} onClick={onLogout}>Sign out</Button>
-          </div>
-        </header>
+          </header>
 
         {/* ── Attention summary ── */}
         <div style={{ marginBottom: 16, fontSize: 14, color: T.textMuted }}>
@@ -191,28 +209,20 @@ export default function TeamDashboard({ onLogout, fetchers = REAL_FETCHERS, work
             loading={supervisors.status === 'loading'} caption="workspace access" onClick={() => setTab('departments')} />
         </div>
 
-        {/* ── Tabs ── */}
-        <div style={{ marginBottom: 22 }}>
-          <SegmentedNav active={tab} onChange={setTab} tabs={[
-            { ...TABS[0], count: approvalSites.length },
-            { ...TABS[1], count: supCount },
-            { ...TABS[2] },
-          ]} />
+          {/* ── Panels ── */}
+          <div key={tab} className="ac-fade-in">
+            {tab === 'approvals' && (
+              <ApprovalCenter data={approvalData} handlers={handlers} onRetry={() => reloadApprovals(false)} />
+            )}
+            {tab === 'departments' && (
+              <DepartmentsTab org={org} pendingSupervisors={supervisors} handlers={handlers} />
+            )}
+            {tab === 'sites' && (
+              <SitesTab data={sites} fetchHistory={fetchers.fetchSiteHistory} onRetry={loadSites} />
+            )}
+          </div>
         </div>
-
-        {/* ── Panels ── */}
-        <div key={tab} className="ac-fade-in">
-          {tab === 'approvals' && (
-            <ApprovalCenter data={approvalData} handlers={handlers} onRetry={() => reloadApprovals(false)} />
-          )}
-          {tab === 'departments' && (
-            <DepartmentsTab org={org} pendingSupervisors={supervisors} handlers={handlers} />
-          )}
-          {tab === 'sites' && (
-            <SitesTab data={sites} fetchHistory={fetchers.fetchSiteHistory} onRetry={loadSites} />
-          )}
-        </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -16,9 +16,11 @@ import React from 'react';
 // pure data-theme swap on the portal root, with contrast tuned in both.
 export const T = {
   bg:            'var(--ac-bg)',
+  panel:         'var(--ac-panel)',        // big rounded sidebar / main panels
   surface:       'var(--ac-surface)',
   surfaceRaised: 'var(--ac-surface-raised)',
   surfaceInset:  'var(--ac-surface-inset)',
+  cardShadow:    'var(--ac-card-shadow)',
   line:          'var(--ac-line)',
   lineStrong:    'var(--ac-line-strong)',
   chip:          'var(--ac-chip)',        // subtle neutral fill (icon chips, ghost buttons)
@@ -120,6 +122,12 @@ export const Icon = {
   flag:    (p) => <Svg {...p}><path d="M5 21V4"/><path d="M5 4h11l-1.6 3.5L16 11H5"/></Svg>,
   sun:     (p) => <Svg {...p}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></Svg>,
   moon:    (p) => <Svg {...p}><path d="M20 13.5A8 8 0 1 1 10.5 4a6.5 6.5 0 0 0 9.5 9.5Z"/></Svg>,
+  panel:   (p) => <Svg {...p}><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/></Svg>,
+  scaleLogo: ({ size = 22, ...p }) => (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true" {...p}>
+      <path d="M4 5.5 L20 5.5 L12 12 L20 18.5 L4 18.5 L12 12 Z" />
+    </svg>
+  ),
 };
 
 export const inr = (n) => (n == null ? '—' : `₹${Number(n).toLocaleString('en-IN')}`);
@@ -142,7 +150,7 @@ export function Avatar({ name, email, size = 30 }) {
 // ── Card ──────────────────────────────────────────────────────────────────────
 
 export function Card({ as: Tag = 'div', interactive = false, raised = false, style, className = '', ...rest }) {
-  const cls = ['ac-card', interactive ? 'ac-interactive' : '', className].filter(Boolean).join(' ');
+  const cls = ['ac-card', interactive ? 'ac-interactive' : '', raised ? 'is-raised' : '', className].filter(Boolean).join(' ');
   return (
     <Tag
       className={cls}
@@ -175,7 +183,7 @@ const BTN_SIZES = {
 export function Button({ variant = 'subtle', size = 'sm', loading = false, icon, children, style, disabled, ...rest }) {
   return (
     <button
-      className="ac-btn"
+      className={`ac-btn v-${variant}`}
       disabled={disabled || loading}
       style={{ fontWeight: 650, cursor: 'pointer', ...BTN_VARIANTS[variant], ...BTN_SIZES[size], ...style }}
       {...rest}

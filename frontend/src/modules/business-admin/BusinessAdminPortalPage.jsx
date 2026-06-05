@@ -33,7 +33,7 @@ class BusinessAdminErrorBoundary extends React.Component {
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <div style={{ maxWidth: 460, textAlign: 'center' }}>
           <div style={{ fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)' }}>
-            Matrix · Business admin
+            Scale · Business admin
           </div>
           <h1 style={{ margin: '8px 0 6px', fontSize: 22, fontWeight: 720, letterSpacing: '-0.02em' }}>
             Approval center hit a display error

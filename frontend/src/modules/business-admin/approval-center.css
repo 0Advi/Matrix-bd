@@ -10,10 +10,12 @@
 
 /* ── DARK (default) ──────────────────────────────────────────────────────── */
 .ac-root {
-  --ac-bg: #0B0C10;
-  --ac-surface: rgba(255, 255, 255, 0.035);
-  --ac-surface-raised: #16171F;
+  --ac-bg: #08090C;                        /* outermost page (behind the floating panels) */
+  --ac-panel: #0E0F14;                      /* the big rounded sidebar / main panels */
+  --ac-surface: rgba(255, 255, 255, 0.03);  /* subtle card fill on a panel */
+  --ac-surface-raised: #181B23;             /* raised cards (KPIs, rows) */
   --ac-surface-inset: rgba(0, 0, 0, 0.35);
+  --ac-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   --ac-line: rgba(255, 255, 255, 0.10);
   --ac-line-strong: rgba(255, 255, 255, 0.16);
   --ac-chip: rgba(255, 255, 255, 0.06);
@@ -58,10 +60,12 @@
 
 /* ── LIGHT ───────────────────────────────────────────────────────────────── */
 .ac-root[data-theme="light"] {
-  --ac-bg: #F4F5F8;
-  --ac-surface: #FFFFFF;
+  --ac-bg: #E9EBEF;
+  --ac-panel: #FFFFFF;
+  --ac-surface: #F6F7F9;
   --ac-surface-raised: #FFFFFF;
   --ac-surface-inset: #EEF0F4;
+  --ac-card-shadow: 0 1px 2px rgba(17, 21, 30, 0.05), 0 6px 16px -10px rgba(17, 21, 30, 0.16);
   --ac-line: rgba(17, 21, 30, 0.10);
   --ac-line-strong: rgba(17, 21, 30, 0.15);
   --ac-chip: rgba(17, 21, 30, 0.05);
@@ -117,10 +121,27 @@
   transition: box-shadow .15s ease, transform .12s ease, opacity .15s ease, background-color .2s ease, color .2s ease;
   -webkit-tap-highlight-color: transparent;
 }
-.ac-btn:hover:not(:disabled)  { box-shadow: inset 0 0 0 999px var(--ac-hover); }
-.ac-btn:active:not(:disabled) { transform: scale(.985); box-shadow: inset 0 0 0 999px var(--ac-press); }
+.ac-btn:hover:not(:disabled)  { transform: translateY(-1px); box-shadow: inset 0 0 0 999px var(--ac-hover); }
+.ac-btn:active:not(:disabled) { transform: translateY(0) scale(.99); box-shadow: inset 0 0 0 999px var(--ac-press); }
 .ac-btn:focus-visible { outline: 2px solid var(--ac-accent); outline-offset: 2px; }
 .ac-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Per-variant depth — a resting colour shadow that grows on hover (combined with
+   the inset overlay so both apply). Ghost / subtle stay flat. */
+.ac-btn.v-solid   { box-shadow: 0 4px 14px -8px rgba(0, 0, 0, .45); }
+.ac-btn.v-success { box-shadow: 0 5px 16px -8px var(--ac-success); }
+.ac-btn.v-danger  { box-shadow: 0 5px 16px -8px var(--ac-danger); }
+.ac-btn.v-accent  { box-shadow: 0 5px 16px -8px var(--ac-accent); }
+.ac-btn.v-solid:hover:not(:disabled)   { box-shadow: inset 0 0 0 999px var(--ac-hover), 0 7px 20px -8px rgba(0, 0, 0, .5); }
+.ac-btn.v-success:hover:not(:disabled) { box-shadow: inset 0 0 0 999px var(--ac-hover), 0 9px 24px -8px var(--ac-success); }
+.ac-btn.v-danger:hover:not(:disabled)  { box-shadow: inset 0 0 0 999px var(--ac-hover), 0 9px 24px -8px var(--ac-danger); }
+.ac-btn.v-accent:hover:not(:disabled)  { box-shadow: inset 0 0 0 999px var(--ac-hover), 0 9px 24px -8px var(--ac-accent); }
+
+/* ── Sidebar ──────────────────────────────────────────────────────────────── */
+.ac-sidebar { transition: width .24s cubic-bezier(.4, 0, .2, 1); }
+.ac-navitem { transition: background-color .15s ease, color .15s ease, box-shadow .15s ease; }
+.ac-navitem:hover:not(.is-active) { background: var(--ac-chip) !important; }
+.ac-navitem:focus-visible { outline: 2px solid var(--ac-accent); outline-offset: 2px; }
 
 .ac-iconbtn { transition: box-shadow .15s ease, transform .12s ease, color .15s ease, background-color .2s ease, border-color .2s ease; }
 .ac-iconbtn:hover:not(:disabled)  { box-shadow: inset 0 0 0 999px var(--ac-hover); }
@@ -130,6 +151,7 @@
 
 /* ── Cards / interactive surfaces ─────────────────────────────────────────── */
 .ac-card { transition: border-color .16s ease, background-color .2s ease, box-shadow .16s ease, transform .16s ease; }
+.ac-card.is-raised { box-shadow: var(--ac-card-shadow); }   /* resting depth (matters most in light mode) */
 .ac-interactive { cursor: pointer; }
 .ac-interactive:hover {
   transform: translateY(-1px);
