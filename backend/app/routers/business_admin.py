@@ -19,6 +19,7 @@ from app.domain.schemas.business_admin import (
     FinanceApprovalOut,
     Module,
     ModuleCodeOut,
+    OrgResponse,
     PendingSupervisorOut,
 )
 from app.rbac.guards import require_role
@@ -114,3 +115,13 @@ async def approve_finance(
     tenant_id: TenantId,
 ) -> dict:
     return await svc.approve_finance(db, tenant_id, site_id, current_user)
+
+
+@router.get("/org", response_model=OrgResponse)
+async def get_org(
+    db: DbDep,
+    current_user: Annotated[dict, Depends(require_role(Role.BUSINESS_ADMIN))],
+    tenant_id: TenantId,
+) -> dict:
+    """Per-department code + active supervisors and the executives under them."""
+    return await svc.list_org(db, tenant_id)

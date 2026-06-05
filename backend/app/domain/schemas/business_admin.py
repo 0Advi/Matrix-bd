@@ -89,3 +89,31 @@ class AdminSiteOut(BaseModel):
 class AdminSitesResponse(BaseModel):
     items: list[AdminSiteOut]
     total: int
+
+
+# ── Department org tree (supervisors + the executives under them) ─────────────
+
+class OrgExecutiveOut(BaseModel):
+    id: str
+    email: EmailStr
+    name: str
+    joined_at: Optional[datetime] = None
+
+
+class OrgSupervisorOut(BaseModel):
+    id: str
+    email: EmailStr
+    name: str
+    joined_at: Optional[datetime] = None
+    executives: list[OrgExecutiveOut] = []
+
+
+class OrgModuleOut(BaseModel):
+    module: Module
+    code: Optional[str] = None
+    supervisors: list[OrgSupervisorOut] = []
+    unassigned_executives: list[OrgExecutiveOut] = []
+
+
+class OrgResponse(BaseModel):
+    modules: list[OrgModuleOut]

@@ -21,7 +21,12 @@ client.interceptors.response.use(
       throw new ApiError({ status: 0, code: 'TIMEOUT', detail: 'Request timed out', cause: err });
     }
     const status = err.response?.status ?? 0;
-    const detail = err.response?.data?.detail || err.message || 'Request failed';
+    const raw = err.response?.data?.detail || err.message || 'Request failed';
+    // A bare axios "Network Error" (no HTTP response) almost always means CORS
+    // or the backend being unreachable — surface that instead of a cryptic string.
+    const detail = status === 0 && raw === 'Network Error'
+      ? `Network Error contacting API at ${BASE_URL}. Check backend deployment, CORS (Railway CORS_ORIGINS must include this site's domain), and that the backend is running.`
+      : raw;
     if (status === 401) clearAuthToken();
     throw new ApiError({ status, detail, code: err.response?.data?.code, cause: err });
   },

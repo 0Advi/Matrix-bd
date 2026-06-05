@@ -360,3 +360,76 @@ async def approve_finance(
         actor=actor,
         site_id=site_id,
     )
+
+
+# ── Department org tree (supervisors + the executives under them) ─────────────
+
+# Departments shown in the org view. Payment is an approval sub-workflow, not a
+# dept onboarded via a code, so it is intentionally omitted here.
+_ORG_MODULES: tuple[str, ...] = ("bd", "legal", "design", "project")
+
+
+async def list_org(session: AsyncSession, tenant_id: str | UUID) -> dict:
+    """Per-department code + the active supervisors and the executives reporting
+    to each (from user_module_memberships.supervisor_id). Executives with no (or
+    an unknown) supervisor land in `unassigned_executives`."""
+    codes = {
+        r["module"]: r["code"]
+        for r in (await session.execute(
+            text("SELECT module, code FROM module_codes WHERE tenant_id = :tid"),
+            {"tid": tenant_id},
+        )).mappings().all()
+    }
+
+    rows = (await session.execute(
+        text("""
+            SELECT umm.module AS module, umm.role_in_module AS role_in_module,
+                   umm.supervisor_id AS supervisor_id, umm.joined_at AS joined_at,
+                   u.id AS id, u.email AS email, u.name AS name
+              FROM user_module_memberships umm
+              JOIN users u ON u.id = umm.user_id
+             WHERE umm.tenant_id = :tid
+               AND u.is_active = true
+             ORDER BY umm.role_in_module, u.name
+        """),
+        {"tid": tenant_id},
+    )).mappings().all()
+
+    sups_by_mod: dict[str, list[dict]] = {m: [] for m in _ORG_MODULES}
+    execs_by_mod: dict[str, list[dict]] = {m: [] for m in _ORG_MODULES}
+    for r in rows:
+        mod = r["module"]
+        if mod not in sups_by_mod:
+            continue  # skip payment / any non-dept module
+        person = {
+            "id": str(r["id"]),
+            "email": r["email"],
+            "name": r["name"],
+            "joined_at": r["joined_at"],
+        }
+        if r["role_in_module"] == "supervisor":
+            sups_by_mod[mod].append({**person, "executives": []})
+        else:
+            execs_by_mod[mod].append({
+                **person,
+                "_supervisor_id": str(r["supervisor_id"]) if r["supervisor_id"] else None,
+            })
+
+    modules: list[dict] = []
+    for m in _ORG_MODULES:
+        supervisors = sups_by_mod[m]
+        index = {s["id"]: s for s in supervisors}
+        unassigned: list[dict] = []
+        for e in execs_by_mod[m]:
+            sid = e.pop("_supervisor_id")
+            if sid and sid in index:
+                index[sid]["executives"].append(e)
+            else:
+                unassigned.append(e)
+        modules.append({
+            "module": m,
+            "code": codes.get(m),
+            "supervisors": supervisors,
+            "unassigned_executives": unassigned,
+        })
+    return {"modules": modules}

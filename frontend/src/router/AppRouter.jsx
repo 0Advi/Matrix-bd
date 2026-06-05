@@ -35,6 +35,12 @@ import PaymentStubPage       from '../modules/payment/PaymentStubPage.jsx';
 import AdminPortalPage          from '../modules/admin/AdminPortalPage.jsx';
 import BusinessAdminPortalPage  from '../modules/business-admin/BusinessAdminPortalPage.jsx';
 import ProjectQueuePage         from '../modules/project/ProjectQueuePage.jsx';
+
+// Dev-only: Approval Center UI preview with mock data (no backend / no login).
+// DEV gate makes the dynamic import dead code in production (tree-shaken out).
+const ApprovalCenterPreview = import.meta.env.DEV
+  ? lazy(() => import('../modules/business-admin/_preview/ApprovalCenterPreview.jsx'))
+  : null;
 import ProjectReviewPage        from '../modules/project/ProjectReviewPage.jsx';
 
 // In HTTP (non-mock) mode the landing page is the unauthenticated entry. The
@@ -105,6 +111,11 @@ export default function AppRouter() {
           gates access via X-Platform-Admin-Key. */}
       <Route path="/admin" element={<AdminPortalPage/>}/>
       <Route path="/business-admin" element={<BusinessAdminPortalPage/>}/>
+      {import.meta.env.DEV && (
+        <Route path="/business-admin-preview" element={
+          <Suspense fallback={null}><ApprovalCenterPreview/></Suspense>
+        }/>
+      )}
 
       <Route element={<RequireAuth><App/></RequireAuth>}>
         <Route index                  element={<IndexRedirect/>}/>
