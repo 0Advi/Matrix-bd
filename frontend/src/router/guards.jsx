@@ -28,7 +28,6 @@ const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true' || import.meta.env.VIT
 function homeForSession(role, module) {
   if (role === 'business_admin') return '/business-admin';
   if (module === 'legal')        return ROUTES.LEGAL;
-  if (module === 'payment')      return ROUTES.PAYMENT;
   if (module === 'design')       return ROUTES.DESIGN;
   return ROUTES.OVERVIEW;
 }

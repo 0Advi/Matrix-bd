@@ -51,7 +51,6 @@ const LANDING_PATH = '/welcome';
 function homeForRoleModule(role, module) {
   if (role === 'business_admin') return '/business-admin';
   if (module === 'legal')        return ROUTES.LEGAL;
-  if (module === 'payment')      return ROUTES.PAYMENT;
   if (module === 'design')       return ROUTES.DESIGN;
   if (module === 'project')      return ROUTES.PROJECT;
   return ROUTES.OVERVIEW; // BD / unknown → default to BD overview
@@ -91,7 +90,6 @@ function IndexRedirect() {
   const module = session?.module;
   if (USE_MOCK) return <OverviewPage/>; // mock mode stays on BD
   if (module === 'legal')   return <Navigate to={ROUTES.LEGAL}   replace/>;
-  if (module === 'payment') return <Navigate to={ROUTES.PAYMENT} replace/>;
   if (module === 'design')  return <Navigate to={ROUTES.DESIGN}  replace/>;
   if (module === 'project') return <Navigate to={ROUTES.PROJECT} replace/>;
   return <OverviewPage/>;
@@ -208,9 +206,6 @@ export default function AppRouter() {
         <Route path={ROUTES.PAYMENT} element={
           <PaymentRoute/>
         }/>
-        <Route path={ROUTES.PAYMENT_SITE_LICENSING} element={
-          <PaymentLicensingRedirect/>
-        }/>
         <Route path="/payment/*" element={<Navigate to={ROUTES.PAYMENT} replace/>}/>
 
         <Route path={ROUTES.DESIGN} element={
@@ -289,16 +284,12 @@ export default function AppRouter() {
 
         <Route path={ROUTES.SITE_TRACKER} element={
           <RequireRole roles={['supervisor', 'executive', 'exec']}>
-            <RequireModule modules={['bd', 'payment']}>
-              <SiteTrackerListPage/>
-            </RequireModule>
+            <SiteTrackerListPage/>
           </RequireRole>
         }/>
         <Route path={ROUTES.SITE_TRACKER_DETAIL} element={
           <RequireRole roles={['supervisor', 'executive', 'exec']}>
-            <RequireModule modules={['bd', 'payment']}>
-              <SiteTrackerDetailPage/>
-            </RequireModule>
+            <SiteTrackerDetailPage/>
           </RequireRole>
         }/>
 
@@ -327,23 +318,14 @@ function StagingRedirect() {
   return <Navigate to={isExec ? ROUTES.STAGING_EXEC : ROUTES.STAGING_SUPERVISOR} replace/>;
 }
 
-function PaymentLicensingRedirect() {
-  const { siteId } = useParams();
-  return <Navigate to={ROUTES.LEGAL_SITE_LICENSING.replace(':siteId', siteId)} replace/>;
-}
-
 function PaymentRoute() {
-  const { role, session } = useSession();
-  const isPaymentModule = session?.module === 'payment';
-  const isBdSupervisor = (!session?.module || session?.module === 'bd') && role === 'supervisor';
-  if (!isPaymentModule && !isBdSupervisor) {
+  // Payment is the BD finance / CA-readiness view — a supervisor surface within
+  // BD, not its own module. Gate it on role, not a module claim.
+  const { role } = useSession();
+  if (role !== 'supervisor') {
     return <Navigate to={ROUTES.OVERVIEW} replace/>;
   }
-  return (
-    <RequireModule modules={['bd', 'payment']}>
-      <PaymentStubPage/>
-    </RequireModule>
-  );
+  return <PaymentStubPage/>;
 }
 
 function LegacySiteFlowRedirect() {

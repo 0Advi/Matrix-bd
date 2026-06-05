@@ -19,7 +19,6 @@ export const ROUTES = {
   LEGAL_SITE_AGREEMENT:   '/legal/sites/:siteId/agreement',
   LEGAL_SITE_LICENSING:   '/legal/sites/:siteId/licensing',
   PAYMENT:                '/payment',
-  PAYMENT_SITE_LICENSING: '/payment/sites/:siteId/licensing',
   DESIGN:                 '/design',
   DESIGN_SITE:            '/design/sites/:siteId',
   DESIGN_HISTORY:         '/design/history',
@@ -62,10 +61,6 @@ export function legalSiteLicensingRoute(siteId) {
 
 export function legalHistorySiteRoute(siteId) {
   return ROUTES.LEGAL_HISTORY_SITE.replace(':siteId', siteId);
-}
-
-export function paymentSiteLicensingRoute(siteId) {
-  return ROUTES.PAYMENT_SITE_LICENSING.replace(':siteId', siteId);
 }
 
 export function designSiteRoute(siteId) {
