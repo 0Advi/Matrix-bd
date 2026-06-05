@@ -25,19 +25,35 @@ export default function Sidebar({
       background: T.panel, border: `1px solid ${T.line}`, borderRadius: 22, boxShadow: T.cardShadow,
       display: 'flex', flexDirection: 'column', padding: '18px 14px', overflow: 'hidden',
     }}>
-      {/* Brand */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '2px 6px 18px', minWidth: 0 }}>
+      {/* Brand + collapse toggle (always visible, top) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 4px 16px', minWidth: 0 }}>
         <span style={{ width: 36, height: 36, borderRadius: 11, flexShrink: 0, display: 'inline-flex',
           alignItems: 'center', justifyContent: 'center', background: T.accentSoft, color: T.accent }}>
           <Icon.scaleLogo size={20} />
         </span>
         {expanded && (
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontSize: 16, fontWeight: 760, letterSpacing: '-0.02em', color: T.text, lineHeight: 1 }}>{brand}</div>
             <div style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: T.textFaint, marginTop: 4 }}>{sub}</div>
           </div>
         )}
+        {expanded && (
+          <button className="ac-iconbtn" onClick={onToggleExpanded} aria-label="Collapse sidebar" title="Collapse"
+            style={{ width: 30, height: 30, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: 9, border: `1px solid ${T.line}`, background: T.chip, color: T.textMuted, cursor: 'pointer' }}>
+            <Icon.chevronsLeft size={16} />
+          </button>
+        )}
       </div>
+
+      {/* Expand toggle (shown only when collapsed) */}
+      {!expanded && (
+        <button className="ac-iconbtn" onClick={onToggleExpanded} aria-label="Expand sidebar" title="Expand"
+          style={{ width: '100%', height: 38, marginBottom: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            borderRadius: 10, border: `1px solid ${T.line}`, background: T.chip, color: T.textMuted, cursor: 'pointer' }}>
+          <Icon.chevronsRight size={18} />
+        </button>
+      )}
 
       {/* Nav */}
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
@@ -89,11 +105,6 @@ export default function Sidebar({
           style={{ ...rowBase(expanded), height: 42 }}>
           <span style={{ display: 'inline-flex', flexShrink: 0 }}><Icon.signout size={19} /></span>
           {expanded && <span>Sign out</span>}
-        </button>
-        <button className="ac-navitem" onClick={onToggleExpanded} title={expanded ? 'Collapse' : 'Expand'}
-          style={{ ...rowBase(expanded), height: 42, color: T.textFaint }}>
-          <span style={{ display: 'inline-flex', flexShrink: 0 }}><Icon.panel size={19} /></span>
-          {expanded && <span>Collapse</span>}
         </button>
       </div>
     </aside>

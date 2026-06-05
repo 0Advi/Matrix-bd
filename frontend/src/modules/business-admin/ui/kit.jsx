@@ -117,6 +117,8 @@ export const Icon = {
   clock:   (p) => <Svg {...p}><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></Svg>,
   search:  (p) => <Svg {...p}><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></Svg>,
   caret:   (p) => <Svg {...p}><path d="m9 6 6 6-6 6"/></Svg>,
+  chevronsLeft:  (p) => <Svg {...p}><path d="m11 7-5 5 5 5M18 7l-5 5 5 5"/></Svg>,
+  chevronsRight: (p) => <Svg {...p}><path d="m13 7 5 5-5 5M6 7l5 5-5 5"/></Svg>,
   pin:     (p) => <Svg {...p}><path d="M12 21s-6-5.2-6-10a6 6 0 0 1 12 0c0 4.8-6 10-6 10Z"/><circle cx="12" cy="11" r="2.2"/></Svg>,
   scale:   (p) => <Svg {...p}><path d="M12 4v16M7 20h10"/><path d="M5 8h14l-3 5a3 3 0 0 1-8 0L5 8Z"/></Svg>,
   flag:    (p) => <Svg {...p}><path d="M5 21V4"/><path d="M5 4h11l-1.6 3.5L16 11H5"/></Svg>,
