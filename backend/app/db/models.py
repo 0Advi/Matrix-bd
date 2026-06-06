@@ -644,6 +644,15 @@ class DesignDeliverable(Base):
 class ProjectReview(Base):
     """One row per site for the Project Execution module."""
     __tablename__ = "project_reviews"
+    # `updated_at` is a server-side onupdate (func.now()). Every write path
+    # (budget save/submit, allocate, reviews, milestones) updates this row and
+    # then reads it back via _build_response. Without eager_defaults the column
+    # is left *expired* after the UPDATE flush, so reading review.updated_at
+    # triggers a lazy refresh — a synchronous DB call inside the async session,
+    # which raises MissingGreenlet and surfaces to the client as a CORS-masked
+    # 500 ("Network Error"). eager_defaults fetches server defaults/onupdates
+    # back via RETURNING during flush, so the attribute stays populated.
+    __mapper_args__ = {"eager_defaults": True}
 
     site_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("sites.id", ondelete="CASCADE"), primary_key=True,

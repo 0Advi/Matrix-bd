@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
@@ -49,6 +50,30 @@ app.add_middleware(
 )
 
 
+def _cors_headers_for(request: Request) -> dict[str, str]:
+    """CORS headers to echo back on an error response.
+
+    Starlette runs the `Exception` handler in ServerErrorMiddleware, which sits
+    *outside* CORSMiddleware — so a 500 returned here would otherwise carry no
+    `Access-Control-Allow-Origin` header and the browser reports it as a generic
+    "Network Error" instead of the real status. Re-apply the headers (mirroring
+    the CORSMiddleware allow-list) so the frontend can actually read the 500.
+    """
+    origin = request.headers.get("origin")
+    if not origin:
+        return {}
+    allowed = origin in settings.cors_origin_list
+    if not allowed and settings.cors_origin_regex:
+        allowed = bool(re.fullmatch(settings.cors_origin_regex, origin))
+    if not allowed:
+        return {}
+    return {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Credentials": "true",
+        "Vary": "Origin",
+    }
+
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Last-resort handler. Logs the traceback and returns a sanitised 500
@@ -57,6 +82,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "Internal server error"},
+        headers=_cors_headers_for(request),
     )
 
 
