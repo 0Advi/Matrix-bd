@@ -182,7 +182,25 @@ function SiteOverviewTab({ site }) {
     || (hasValue(site.pin) && site.pin !== '—'
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(site.pin)}`
       : null);
-  const photos = Array.isArray(site.photos) ? site.photos.filter((photo) => photo?.url) : [];
+  // Photos live in the site_files table, not on the list payload (which always
+  // carries photos: []). Fetch them here so they appear on reopen (exec) and
+  // after push (supervisor) — both view the site through this drawer.
+  const [photos, setPhotos] = useState(() =>
+    Array.isArray(site.photos) ? site.photos.filter((photo) => photo?.url) : []
+  );
+  useEffect(() => {
+    let cancelled = false;
+    getSiteDocuments(site.id)
+      .then((res) => {
+        if (cancelled) return;
+        const fetched = (res?.documents || [])
+          .filter((d) => d.fileType === 'photo' && d.url)
+          .map((d) => ({ id: d.id, url: d.url, name: d.fileName }));
+        if (fetched.length) setPhotos(fetched);
+      })
+      .catch(() => { /* photos are non-blocking — ignore load errors */ });
+    return () => { cancelled = true; };
+  }, [site.id]);
   const escalationValue = hasValue(site.escalation)
     ? `${formatPercent(site.escalation)}${hasValue(site.escalationYears) ? ` every ${site.escalationYears} yr` : ' / yr'}`
     : 'Not captured yet';
