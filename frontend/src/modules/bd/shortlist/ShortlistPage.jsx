@@ -8,6 +8,7 @@ import Icon from '../../shared/primitives/Icon.jsx';
 import StatusPill from '../../shared/primitives/StatusPill.jsx';
 import AddDetailsPage from '../../loi/details/AddDetailsPage.jsx';
 import * as siteService from '../../../services/api/siteService.js';
+import { listMyTeam } from '../../../services/api/adapters/httpAdapter.js';
 
 // All render bodies preserved exactly from Shortlist.jsx.
 
@@ -72,14 +73,15 @@ function DelegationModal({ site, onClose, onChanged, showToast }) {
   const load = React.useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [list, users] = await Promise.all([
+      const [list, team] = await Promise.all([
         siteService.listSiteDelegations(site.id),
-        siteService.listUsers(),
+        listMyTeam('bd'),
       ]);
       setDelegations(list);
-      // Only BD executives are eligible delegates — filter by both role and module
-      // so executives from legal/payment/design/project are not shown.
-      setCandidates(users.filter(u => u.role === 'executive' && (u.module === 'bd' || u.module == null)));
+      // listMyTeam('bd') returns only this supervisor's BD executives — the same
+      // module-scoped primitive Legal/Design/Project use — so executives from
+      // other departments never appear in the picker.
+      setCandidates(team);
     } catch (err) {
       setError(err?.message || 'Failed to load delegations');
     } finally {
@@ -191,10 +193,10 @@ function AssignDetailsModal({ site, currentUserId, onClose, onAssigned, showToas
   React.useEffect(() => {
     let alive = true;
     setLoading(true);
-    siteService.listUsers()
-      .then((users) => {
+    listMyTeam('bd')
+      .then((team) => {
         if (!alive) return;
-        setCandidates(users.filter((u) => u.role === 'executive' && (u.module === 'bd' || u.module == null) && String(u.id) !== String(currentUserId || '')));
+        setCandidates(team.filter((u) => String(u.id) !== String(currentUserId || '')));
         setError(null);
       })
       .catch((err) => {
