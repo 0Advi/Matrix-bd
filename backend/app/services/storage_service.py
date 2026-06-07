@@ -15,10 +15,32 @@ Behaviour without config:
 """
 from __future__ import annotations
 
+import re
+import unicodedata
+
 import httpx
 from fastapi import HTTPException, status
 
 from app.core.config import settings
+
+
+def safe_object_name(filename: str, *, fallback: str = "file") -> str:
+    """Sanitise a user filename into a Supabase-Storage-safe object-key segment.
+
+    Supabase Storage rejects object keys containing non-ASCII / control / odd
+    whitespace characters with a 400 — notably the U+202F narrow no-break space
+    macOS embeds in screenshot names ("…12.14.54 PM.png"), which surfaced as a
+    failed photo upload (400 → 502). We normalise to ASCII and keep only
+    [A-Za-z0-9._-]; the original name is preserved separately for display (the
+    `file_name` column), so only the storage key is affected.
+    """
+    ascii_name = (
+        unicodedata.normalize("NFKD", filename or "")
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", ascii_name).strip("._")
+    return cleaned or fallback
 
 
 def _storage_base() -> str:

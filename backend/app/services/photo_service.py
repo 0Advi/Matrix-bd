@@ -11,7 +11,7 @@ from app.db import models
 from app.db.session import transaction
 from app.services._common import fetch_site_or_404
 from app.services.audit_service import write_audit_event
-from app.services.storage_service import signed_url, upload_bytes
+from app.services.storage_service import safe_object_name, signed_url, upload_bytes
 
 
 async def svc_upload_photo(
@@ -35,8 +35,10 @@ async def svc_upload_photo(
     """
     file_id = _uuid.uuid4()
     # Prefix the filename with a short random hex to avoid collisions when the
-    # same filename is uploaded twice for the same site.
-    safe_name = f"{file_id.hex[:8]}_{filename}"
+    # same filename is uploaded twice for the same site. Sanitise the name for
+    # the storage key (Supabase rejects non-ASCII keys like macOS screenshot
+    # names with a U+202F → 400); the original `filename` is kept for display.
+    safe_name = f"{file_id.hex[:8]}_{safe_object_name(filename)}"
     storage_path = f"photos/{tenant_id}/{site_id}/{safe_name}"
 
     # Upload first — if storage fails the transaction never opens.

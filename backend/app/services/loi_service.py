@@ -17,7 +17,7 @@ from fastapi import HTTPException, status as http_status
 from app.services._common import fetch_site_or_404
 from app.services.audit_service import write_audit_event
 from app.services.notification_service import enqueue as notify_enqueue, recipients_for_supervisors
-from app.services.storage_service import signed_url, upload_bytes
+from app.services.storage_service import safe_object_name, signed_url, upload_bytes
 
 
 async def svc_upload_loi(
@@ -47,7 +47,9 @@ async def svc_upload_loi(
             )
         assert_transition(SiteStatus(site.status), SiteStatus.LOI_UPLOADED)
 
-        storage_path = f"loi/{tenant_id}/{site_id}/{filename}"
+        # Sanitise the storage key — Supabase rejects non-ASCII keys (400).
+        # The original name is kept on the file_name column for display.
+        storage_path = f"loi/{tenant_id}/{site_id}/{safe_object_name(filename, fallback='loi.pdf')}"
         await upload_bytes(
             path=storage_path, body=file_bytes, content_type=content_type or "application/pdf",
         )
