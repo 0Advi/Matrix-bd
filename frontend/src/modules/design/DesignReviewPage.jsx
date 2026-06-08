@@ -45,6 +45,13 @@ const input = {
   color: 'var(--zm-fg)', fontFamily: 'var(--zm-font-body)', fontSize: 12.5, width: '100%',
 };
 
+function formatFileSize(size) {
+  if (!Number.isFinite(size) || size <= 0) return '';
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function CommentBlock({ who, text, danger }) {
   return (
     <div style={{
@@ -64,15 +71,21 @@ function DeliverableCard({ kind, deliverable, isActive, isExecutive, isSuperviso
   const tone = DELIV_TONE[status] || DELIV_TONE.pending;
   const isBoq = kind === 'boq';
   const needsAdmin = kind === '2d' || kind === '3d';
+  const fileInputRef = React.useRef(null);
   const [file, setFile] = React.useState(null);
   const [amount, setAmount] = React.useState('');
   const [comments, setComments] = React.useState('');
 
-  React.useEffect(() => {
+  const clearSelectedFile = React.useCallback(() => {
     setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, []);
+
+  React.useEffect(() => {
+    clearSelectedFile();
     setAmount(deliverable?.estimatedAmount ?? '');
     setComments('');
-  }, [deliverable?.estimatedAmount, deliverable?.fileName, deliverable?.downloadUrl, status]);
+  }, [clearSelectedFile, deliverable?.estimatedAmount, deliverable?.fileName, deliverable?.downloadUrl, status]);
 
   const hasSubmittedArtifact = isBoq
     ? deliverable?.estimatedAmount != null
@@ -135,11 +148,87 @@ function DeliverableCard({ kind, deliverable, isActive, isExecutive, isSuperviso
           {isBoq ? (
             <input style={input} type="number" placeholder="Estimated amount (₹)" value={amount} onChange={(e) => setAmount(e.target.value)}/>
           ) : (
-            <input
-              type="file"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-              style={{ ...input, height: 'auto', padding: '7px 10px', cursor: 'pointer' }}
-            />
+            <div
+              style={{
+                border: '1px solid var(--zm-line)',
+                borderRadius: 9,
+                background: 'var(--zm-surface)',
+                padding: 10,
+                display: 'grid',
+                gap: 8,
+              }}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                style={{ display: 'none' }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    height: 30,
+                    padding: '0 11px',
+                    borderRadius: 7,
+                    border: '1px solid var(--zm-line)',
+                    background: 'var(--zm-surface-2)',
+                    color: 'var(--zm-fg)',
+                    fontFamily: 'var(--zm-font-body)',
+                    fontSize: 12,
+                    fontWeight: 800,
+                    cursor: busy ? 'wait' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <Icon name="upload" size={12}/>
+                  Choose file
+                </button>
+                {file ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={clearSelectedFile}
+                    title="Clear selected file"
+                    style={{
+                      height: 28,
+                      width: 28,
+                      borderRadius: 7,
+                      border: '1px solid var(--zm-line)',
+                      background: 'transparent',
+                      color: 'var(--zm-fg-3)',
+                      cursor: busy ? 'wait' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+              <div
+                style={{
+                  minHeight: 20,
+                  fontFamily: 'var(--zm-font-body)',
+                  fontSize: 12.5,
+                  color: file ? 'var(--zm-fg)' : 'var(--zm-fg-3)',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'anywhere',
+                }}
+              >
+                {file ? (
+                  <>
+                    <strong>{file.name}</strong>
+                    {formatFileSize(file.size) ? <span style={{ color: 'var(--zm-fg-3)' }}> · {formatFileSize(file.size)}</span> : null}
+                  </>
+                ) : 'No file selected yet.'}
+              </div>
+            </div>
           )}
           <button
             type="button"

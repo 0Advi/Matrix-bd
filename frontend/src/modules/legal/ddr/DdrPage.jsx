@@ -13,6 +13,7 @@ import {
   delegateLegal,
   revokeLegalDelegation,
   listLegalDelegationsForSite,
+  listMyLegalAssignments,
 } from '../../../services/api/legalDelegationApi.js';
 import { listMyTeam } from '../../../services/api/adapters/httpAdapter.js';
 import { ROUTES, legalSiteAgreementRoute, legalSiteLicensingRoute } from '../../../router/routes.js';
@@ -133,10 +134,10 @@ export default function DdrPage() {
   const { siteId } = useParams();
   const navigate = useNavigate();
   const { showToast } = usePageContext();
-  const { role, session } = useSession();
+  const { role, session, user } = useSession();
   const isSupervisor = role === 'supervisor';
   const isExecutive  = role === 'executive' || role === 'exec';
-  const myUserId = session?.userId || null;
+  const myUserId = session?.userId || session?.id || session?.sub || user?.id || null;
 
   const [review, setReview] = React.useState(null);
   const [loadState, setLoadState] = React.useState('loading'); // loading | ready | error
@@ -153,30 +154,41 @@ export default function DdrPage() {
   const [selectedExec, setSelectedExec] = React.useState('');
   const [delegating, setDelegating] = React.useState(false);
 
-  React.useEffect(() => {
-    if (!siteId) return;
-    // Delegations are needed by:
-    //   • supervisors — to render the delegate panel
-    //   • executives  — to decide whether the licensing CTA is unlocked
-    //                    (auto-inherited after a positive published DD)
-    // Failures degrade silently so the rest of the DDR page keeps working.
-    if (isSupervisor) {
-      listMyTeam('legal').then(setExecutives).catch(() => setExecutives([]));
-    }
-    listLegalDelegationsForSite(siteId)
-      .then((r) => setDelegations(r.items || []))
-      .catch(() => setDelegations([]));
-  }, [siteId, isSupervisor]);
-
-  const refreshDelegations = React.useCallback(async () => {
+  const loadDelegations = React.useCallback(async () => {
     if (!siteId) return;
     try {
+      if (isExecutive) {
+        const r = await listMyLegalAssignments();
+        const items = (r.items || [])
+          .filter((d) => String(d.siteId) === String(siteId))
+          .map((d) => ({ ...d, delegateUserId: d.delegateUserId || myUserId }));
+        setDelegations(items);
+        return;
+      }
       const r = await listLegalDelegationsForSite(siteId);
       setDelegations(r.items || []);
     } catch {
       setDelegations([]);
     }
-  }, [siteId]);
+  }, [siteId, isExecutive, myUserId]);
+
+  React.useEffect(() => {
+    if (!siteId) return;
+    // Delegations are needed by:
+    //   • supervisors — to render the delegate panel
+    //   • executives  — to decide whether the DDR/licensing actions are unlocked
+    //                    for their assigned sites.
+    // Executives use their own assignments endpoint because the site-wide
+    // delegation list is intentionally supervisor-oriented.
+    if (isSupervisor) {
+      listMyTeam('legal').then(setExecutives).catch(() => setExecutives([]));
+    }
+    loadDelegations();
+  }, [siteId, isSupervisor, loadDelegations]);
+
+  const refreshDelegations = React.useCallback(async () => {
+    await loadDelegations();
+  }, [loadDelegations]);
 
   const handleDelegate = async () => {
     if (!selectedExec) return;
