@@ -11,6 +11,8 @@ import {
   PendingApprovalError,
   InvalidCredentialsError,
 } from '../../services/api/supabaseAuth.js';
+import LottiePanel from './LottiePanel.jsx';
+import dataSecurityAnim from '../../assets/lottie/data-security.json';
 import './branded-auth.css';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -255,25 +257,40 @@ export default function BrandedLoginPage() {
 
   return (
     <div className="bl-shell">
-      <div className="bl-card">
-        <header className="bl-head">
-          {brand.logo
-            ? <img className="bl-logo" src={brand.logo} alt={brand.name} />
-            : <div className="bl-logo bl-logo--ph" aria-hidden>{(brand.name || 'W').slice(0, 1).toUpperCase()}</div>}
-          <div className="bl-head-text">
-            <span className="bl-eyebrow">Workspace</span>
-            <h1 className="bl-brand">{brand.status === 'loading' ? '…' : brand.name}</h1>
+      <div className="bl-card bl-card--split">
+        <aside className="bl-aside">
+          <LottiePanel
+            data={dataSecurityAnim}
+            className="bl-aside-anim"
+            fallbackClassName="bl-aside-anim bl-aside-fallback"
+          />
+          <div className="bl-aside-copy">
+            <span className="bl-aside-brand">Z-Matrix</span>
+            <h2>Secure access to your workspace</h2>
+            <p>Sign in to continue to {brand.status === 'ready' ? brand.name : 'your workspace'}.</p>
           </div>
-        </header>
+        </aside>
 
-        <div className="bl-tabs" role="tablist">
-          <button type="button" role="tab" aria-selected={tab === 'login'} data-active={tab === 'login'} onClick={() => setTab('login')}>Log in</button>
-          <button type="button" role="tab" aria-selected={tab === 'join'} data-active={tab === 'join'} onClick={() => setTab('join')}>Join</button>
+        <div className="bl-main">
+          <header className="bl-head">
+            {brand.logo
+              ? <img className="bl-logo" src={brand.logo} alt={brand.name} />
+              : <div className="bl-logo bl-logo--ph" aria-hidden>{(brand.name || 'W').slice(0, 1).toUpperCase()}</div>}
+            <div className="bl-head-text">
+              <span className="bl-eyebrow">Workspace</span>
+              <h1 className="bl-brand">{brand.status === 'loading' ? '…' : brand.name}</h1>
+            </div>
+          </header>
+
+          <div className="bl-tabs" role="tablist">
+            <button type="button" role="tab" aria-selected={tab === 'login'} data-active={tab === 'login'} onClick={() => setTab('login')}>Log in</button>
+            <button type="button" role="tab" aria-selected={tab === 'join'} data-active={tab === 'join'} onClick={() => setTab('join')}>Join</button>
+          </div>
+
+          {tab === 'login'
+            ? <LoginPanel code={code} onAuthed={(token) => navigate(routeFromToken(token))} />
+            : <JoinPanel />}
         </div>
-
-        {tab === 'login'
-          ? <LoginPanel code={code} onAuthed={(token) => navigate(routeFromToken(token))} />
-          : <JoinPanel />}
       </div>
       <p className="bl-foot">Powered by Z-Matrix &middot; {code}</p>
     </div>

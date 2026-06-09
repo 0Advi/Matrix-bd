@@ -1,50 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useRive, useStateMachineInput, Layout, Fit, Alignment } from '@rive-app/react-canvas';
-import RiveErrorBoundary from './RiveErrorBoundary.jsx';
+import LottiePanel from './LottiePanel.jsx';
 import { getWorkspaceBranding } from '../../services/api/supabaseAuth.js';
-import riveUrl from '../../assets/rive/workspace-code.riv?url';
+import communityAnim from '../../assets/lottie/workspace-community.json';
 import './branded-auth.css';
 
 const CODE_RE = /^[A-Za-z0-9-]{4,32}$/;
-
-/**
- * The decorative left panel. Rive runs here only — it is purely visual.
- * `Main` is the state machine inside the .riv; `hover` is a boolean input we
- * drive on mouse enter/leave so the hover effect plays. If the SM is named
- * differently, the runtime-discovery effect still starts whatever exists.
- */
-function RivePanel() {
-  const { rive, RiveComponent } = useRive({
-    src: riveUrl,
-    stateMachines: 'Main',
-    autoplay: true,
-    layout: new Layout({ fit: Fit.Cover, alignment: Alignment.Center }),
-  });
-  const hoverInput = useStateMachineInput(rive, 'Main', 'hover');
-
-  // Belt-and-suspenders: make sure *some* state machine is running, whatever
-  // it is named, so pointer/hover forwarding works.
-  React.useEffect(() => {
-    if (!rive) return;
-    try {
-      const names = rive.stateMachineNames || [];
-      if (names.length) rive.play(names);
-    } catch { /* ignore — fallback static panel still shows */ }
-  }, [rive]);
-
-  const setHover = (v) => { if (hoverInput) hoverInput.value = v; };
-
-  return (
-    <div
-      className="wsc-rive"
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-    >
-      <RiveComponent className="wsc-rive-canvas" />
-    </div>
-  );
-}
 
 export default function WorkspaceCodeDialog({ open, onClose }) {
   const navigate = useNavigate();
@@ -86,9 +47,11 @@ export default function WorkspaceCodeDialog({ open, onClose }) {
         onMouseDown={(e) => e.stopPropagation()}>
 
         <aside className="wsc-left">
-          <RiveErrorBoundary fallback={<div className="wsc-rive wsc-rive-fallback" />}>
-            <RivePanel />
-          </RiveErrorBoundary>
+          <LottiePanel
+            data={communityAnim}
+            className="wsc-anim"
+            fallbackClassName="wsc-anim wsc-anim-fallback"
+          />
           <div className="wsc-left-copy">
             <span className="wsc-left-brand">Z-Matrix</span>
             <h3>Find your workspace</h3>

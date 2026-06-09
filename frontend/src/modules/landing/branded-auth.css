@@ -1,6 +1,6 @@
 /* ── Branded auth: workspace-code dialog + customized login page ───────────────
-   Self-contained styles. The decorative Rive panel degrades to a static
-   gradient (.wsc-rive-fallback / the .wsc-left background) so the form is never
+   Self-contained styles. The decorative Lottie panels degrade to a static
+   gradient (.wsc-anim-fallback / .bl-aside-fallback) so the form is never
    visually broken if the animation fails to load. */
 
 :root {
@@ -38,7 +38,7 @@
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-/* ── Left (decorative Rive) ────────────────────────────────────────────────── */
+/* ── Left (decorative Lottie) ──────────────────────────────────────────────── */
 .wsc-left {
   position: relative; flex: 0 0 44%; min-width: 0;
   display: flex; flex-direction: column; justify-content: flex-end;
@@ -49,8 +49,8 @@
     radial-gradient(120% 120% at 90% 100%, rgba(56, 89, 233, 0.30), transparent 55%),
     linear-gradient(160deg, #161a2b 0%, #0d0f17 100%);
 }
-.wsc-rive, .wsc-rive-fallback { position: absolute; inset: 0; }
-.wsc-rive-canvas { width: 100%; height: 100%; display: block; }
+.wsc-anim, .wsc-anim-fallback { position: absolute; inset: 0; }
+.wsc-anim svg { display: block; }
 .wsc-left-copy {
   position: relative; z-index: 2; padding: 26px 26px 28px;
   background: linear-gradient(to top, rgba(8, 10, 16, 0.78) 18%, transparent);
@@ -128,6 +128,34 @@
 }
 .bl-card--narrow { text-align: center; }
 .bl-card--narrow .bl-btn { width: 100%; }
+
+/* Split layout: decorative Lottie aside (left) + form (right). */
+.bl-card--split { width: min(860px, 100%); padding: 0; display: flex; overflow: hidden; }
+.bl-aside {
+  position: relative; flex: 0 0 42%; min-width: 0;
+  display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden;
+  /* Static fallback look — always visible behind/instead of the animation. */
+  background:
+    radial-gradient(120% 90% at 20% 10%, rgba(52, 211, 153, 0.20), transparent 60%),
+    radial-gradient(120% 120% at 90% 100%, rgba(56, 89, 233, 0.28), transparent 55%),
+    linear-gradient(160deg, #161a2b 0%, #0d0f17 100%);
+}
+.bl-aside-anim, .bl-aside-fallback { position: absolute; inset: 0; }
+.bl-aside-anim svg { display: block; }
+.bl-aside-copy {
+  position: relative; z-index: 2; padding: 26px 26px 28px;
+  background: linear-gradient(to top, rgba(8, 10, 16, 0.82) 16%, transparent);
+}
+.bl-aside-brand { font-size: 11px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ba-accent); }
+.bl-aside-copy h2 { margin: 8px 0 6px; font-size: 21px; font-weight: 700; letter-spacing: -0.01em; color: #fff; }
+.bl-aside-copy p { margin: 0; font-size: 13px; line-height: 1.5; color: rgba(255, 255, 255, 0.72); max-width: 30ch; }
+.bl-main { flex: 1; min-width: 0; padding: 34px 32px 30px; box-sizing: border-box; }
+
+@media (max-width: 720px) {
+  .bl-card--split { flex-direction: column; }
+  .bl-aside { flex: 0 0 180px; min-height: 180px; }
+  .bl-main { padding: 28px 26px 30px; }
+}
 .bl-head { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
 .bl-logo { width: 48px; height: 48px; border-radius: 12px; object-fit: contain; background: #fff; padding: 4px; box-sizing: border-box; flex: 0 0 48px; }
 .bl-logo--ph {
