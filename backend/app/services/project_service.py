@@ -146,6 +146,7 @@ async def _queue_item(
         project_status=(review.project_status if review else "pending"),
         current_stage=(review.current_stage if review else "budget"),
         budget_status=(review.budget_status if review else "draft"),
+        quality_audit_status=(review.quality_audit_status if review else "pending"),
         allocated_to_name=(delegate[1] if delegate else None),
         submitted_by_name=await fetch_user_name(session, site.submitted_by),
     )

@@ -51,6 +51,7 @@ function queueItemFromServer(row) {
     projectStatus: row.project_status,
     currentStage: row.current_stage,
     budgetStatus: row.budget_status,
+    qualityAuditStatus: row.quality_audit_status,
     allocatedToName: row.allocated_to_name,
     submittedByName: row.submitted_by_name,
   };

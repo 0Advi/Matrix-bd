@@ -36,6 +36,9 @@ class ProjectQueueItem(BaseModel):
     project_status: str
     current_stage: str
     budget_status: str
+    # Drives the Pipeline vs Sites split: a site moves to the "Sites" tab once
+    # the executive has uploaded the quality-audit doc (status leaves 'pending').
+    quality_audit_status: str = "pending"
     allocated_to_name: Optional[str] = None
     submitted_by_name: Optional[str] = None
 
