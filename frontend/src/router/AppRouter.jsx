@@ -35,6 +35,10 @@ import DashboardMinimalPreview from '../modules/bd/dashboard-preview/DashboardMi
 import LicensingPage         from '../modules/payment/licensing/LicensingPage.jsx';
 import PaymentStubPage       from '../modules/payment/PaymentStubPage.jsx';
 import LaunchPage            from '../modules/launch/LaunchPage.jsx';
+import LegalOverviewPage     from '../modules/legal/LegalOverviewPage.jsx';
+import DesignOverviewPage    from '../modules/design/DesignOverviewPage.jsx';
+import ProjectOverviewPage   from '../modules/project/ProjectOverviewPage.jsx';
+import NsoOverviewPage       from '../modules/nso/NsoOverviewPage.jsx';
 import AdminPortalPage          from '../modules/admin/AdminPortalPage.jsx';
 import BusinessAdminPortalPage  from '../modules/business-admin/BusinessAdminPortalPage.jsx';
 import ProjectQueuePage         from '../modules/project/ProjectQueuePage.jsx';
@@ -166,6 +170,13 @@ export default function AppRouter() {
             </RequireModule>
           </RequireRole>
         }/>
+        <Route path={ROUTES.LEGAL_OVERVIEW} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['legal']}>
+              <LegalOverviewPage/>
+            </RequireModule>
+          </RequireRole>
+        }/>
         <Route path={ROUTES.LEGAL_CHANGE_REQUESTS} element={
           <RequireRole roles={['supervisor', 'executive', 'exec']}>
             <RequireModule modules={['legal']}>
@@ -235,6 +246,13 @@ export default function AppRouter() {
             </RequireModule>
           </RequireRole>
         }/>
+        <Route path={ROUTES.DESIGN_OVERVIEW} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['design']}>
+              <DesignOverviewPage/>
+            </RequireModule>
+          </RequireRole>
+        }/>
         <Route path={ROUTES.DESIGN_SITE} element={
           <RequireRole roles={['supervisor', 'executive', 'exec']}>
             <RequireModule modules={['design']}>
@@ -262,6 +280,13 @@ export default function AppRouter() {
           <RequireRole roles={['supervisor', 'executive', 'exec']}>
             <RequireModule modules={['project']}>
               <ProjectQueuePage mode="pipeline"/>
+            </RequireModule>
+          </RequireRole>
+        }/>
+        <Route path={ROUTES.PROJECT_OVERVIEW} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['project']}>
+              <ProjectOverviewPage/>
             </RequireModule>
           </RequireRole>
         }/>
@@ -299,6 +324,13 @@ export default function AppRouter() {
           <RequireRole roles={['supervisor', 'executive', 'exec']}>
             <RequireModule modules={['nso']}>
               <NsoQueuePage/>
+            </RequireModule>
+          </RequireRole>
+        }/>
+        <Route path={ROUTES.NSO_OVERVIEW} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['nso']}>
+              <NsoOverviewPage/>
             </RequireModule>
           </RequireRole>
         }/>

@@ -107,6 +107,10 @@ export default function Sidebar({ counts, role, onRole, collapsed = false }) {
     path === ROUTES.ARCHIVE                              ? 'archive'   :
     path === ROUTES.DD_FAILED                            ? 'dd-failed' :
     path === ROUTES.TEAM                                 ? 'team'      :
+    path === ROUTES.LEGAL_OVERVIEW                       ? 'legal-overview' :
+    path === ROUTES.DESIGN_OVERVIEW                      ? 'design-overview' :
+    path === ROUTES.PROJECT_OVERVIEW                     ? 'project-overview' :
+    path === ROUTES.NSO_OVERVIEW                         ? 'nso-overview' :
     path === ROUTES.LEGAL_CHANGE_REQUESTS                ? 'legal-change-requests' :
     path === ROUTES.LEGAL_REJECTED || path.startsWith('/legal/history') ? 'legal-history' :
     path.startsWith('/legal')                            ? 'legal-ddr' :
@@ -160,6 +164,13 @@ export default function Sidebar({ counts, role, onRole, collapsed = false }) {
         <>
           {!collapsed && <div style={{ ...SECTION_HEADING_STYLE, padding: '4px 10px 6px' }}>Legal</div>}
           <SidebarItem
+            icon="dashboard"
+            label="Overview"
+            active={activeView === 'legal-overview'}
+            onClick={() => go(ROUTES.LEGAL_OVERVIEW)}
+            collapsed={collapsed}
+          />
+          <SidebarItem
             icon="legalShield"
             label="Sites"
             active={activeView === 'legal-ddr'}
@@ -187,6 +198,13 @@ export default function Sidebar({ counts, role, onRole, collapsed = false }) {
         <>
           {!collapsed && <div style={{ ...SECTION_HEADING_STYLE, padding: '4px 10px 6px' }}>Design</div>}
           <SidebarItem
+            icon="dashboard"
+            label="Overview"
+            active={activeView === 'design-overview'}
+            onClick={() => go(ROUTES.DESIGN_OVERVIEW)}
+            collapsed={collapsed}
+          />
+          <SidebarItem
             icon="box"
             label="Sites"
             active={activeView === 'design'}
@@ -206,6 +224,13 @@ export default function Sidebar({ counts, role, onRole, collapsed = false }) {
       {userModule === 'project' && (
         <>
           {!collapsed && <div style={{ ...SECTION_HEADING_STYLE, padding: '4px 10px 6px' }}>Project</div>}
+          <SidebarItem
+            icon="dashboard"
+            label="Overview"
+            active={activeView === 'project-overview'}
+            onClick={() => go(ROUTES.PROJECT_OVERVIEW)}
+            collapsed={collapsed}
+          />
           <SidebarItem
             icon="route"
             label="Pipeline"
@@ -233,6 +258,13 @@ export default function Sidebar({ counts, role, onRole, collapsed = false }) {
       {userModule === 'nso' && (
         <>
           {!collapsed && <div style={{ ...SECTION_HEADING_STYLE, padding: '4px 10px 6px' }}>NSO</div>}
+          <SidebarItem
+            icon="dashboard"
+            label="Overview"
+            active={activeView === 'nso-overview'}
+            onClick={() => go(ROUTES.NSO_OVERVIEW)}
+            collapsed={collapsed}
+          />
           <SidebarItem
             icon="home"
             label="Sites"
