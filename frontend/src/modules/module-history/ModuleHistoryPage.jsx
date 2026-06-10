@@ -1,7 +1,8 @@
 import React from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageHeader, { HeaderTag } from '../shared/page-header/PageHeader.jsx';
 import Icon from '../shared/primitives/Icon.jsx';
+import SubFilterPill from '../shared/primitives/SubFilterPill.jsx';
 import { getSiteActivity, labelForEntry } from '../../services/api/audit.js';
 import { getLegalReview, listLegalHistory } from '../../services/api/legalApi.js';
 import { getDesignReview, listDesignHistory } from '../../services/api/designApi.js';
@@ -15,13 +16,14 @@ import {
   ROUTES,
 } from '../../router/routes.js';
 import { useSiteDataRefresh } from '../../hooks/useSiteDataRefresh.js';
+import { useFocusSite } from '../../hooks/useFocusSite.js';
 
 const FILTERS = [
-  { key: 'all', label: 'All' },
-  { key: 'active', label: 'Active' },
-  { key: 'approved', label: 'Approved' },
-  { key: 'rejected', label: 'Rejected' },
-  { key: 'completed', label: 'Completed' },
+  { key: 'all', label: 'All', color: null },
+  { key: 'active', label: 'Active', color: 'var(--zm-accent)' },
+  { key: 'approved', label: 'Approved', color: 'var(--zm-success)' },
+  { key: 'rejected', label: 'Rejected', color: 'var(--zm-danger)' },
+  { key: 'completed', label: 'Completed', color: 'var(--zm-success)' },
 ];
 
 const CONFIG = {
@@ -269,7 +271,20 @@ export default function ModuleHistoryPage({ moduleKey, defaultFilter = 'all' }) 
   const config = CONFIG[moduleKey];
   const { siteId } = useParams();
   const navigate = useNavigate();
-  const [filter, setFilter] = React.useState(defaultFilter);
+  const location = useLocation();
+  useFocusSite();
+  const filterParam = new URLSearchParams(location.search).get('filter');
+  const [filter, setFilter] = React.useState(() => (
+    FILTERS.some((item) => item.key === filterParam) ? filterParam : defaultFilter
+  ));
+
+  // Keep the active filter in sync when a deep link changes ?filter= in place
+  // (e.g. navigating /legal/history?filter=rejected while already mounted).
+  React.useEffect(() => {
+    if (filterParam && FILTERS.some((item) => item.key === filterParam)) {
+      setFilter(filterParam);
+    }
+  }, [filterParam]);
   const [query, setQuery] = React.useState('');
   const [listState, setListState] = React.useState({ status: 'loading', items: [], error: null });
   const [detailState, setDetailState] = React.useState({ status: 'idle', detail: null, audit: [], error: null });
@@ -293,7 +308,13 @@ export default function ModuleHistoryPage({ moduleKey, defaultFilter = 'all' }) 
       });
   }, [config, filter]);
 
-  React.useEffect(() => () => { mountedRef.current = false; }, []);
+  // Reset on every (re)mount: under StrictMode the dev double-mount runs the
+  // cleanup once, and a `() => () => …` effect would leave the ref false
+  // forever, silently dropping every list response.
+  React.useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
   React.useEffect(() => { loadList(); }, [loadList]);
   useSiteDataRefresh(loadList);
 
@@ -352,6 +373,7 @@ export default function ModuleHistoryPage({ moduleKey, defaultFilter = 'all' }) 
               placeholder="Search site, code, city, or owner..."
               style={{
                 width: '100%',
+                boxSizing: 'border-box', // no global reset — without this the 48px padding overflows the flex wrapper onto the pills
                 height: 38,
                 padding: '0 12px 0 36px',
                 borderRadius: 9,
@@ -362,23 +384,14 @@ export default function ModuleHistoryPage({ moduleKey, defaultFilter = 'all' }) 
             />
           </div>
           {FILTERS.map((item) => (
-            <button
+            <SubFilterPill
               key={item.key}
-              type="button"
+              label={item.label}
+              color={item.color}
+              count={item.key === filter && listState.status === 'ready' ? listState.items.length : undefined}
+              active={filter === item.key}
               onClick={() => setFilter(item.key)}
-              style={{
-                height: 34,
-                padding: '0 12px',
-                borderRadius: 999,
-                border: filter === item.key ? '1px solid var(--zm-accent)' : '1px solid var(--zm-line)',
-                background: filter === item.key ? 'var(--zm-accent-weak)' : 'var(--zm-surface)',
-                color: filter === item.key ? 'var(--zm-accent)' : 'var(--zm-fg-2)',
-                fontWeight: 800,
-                cursor: 'pointer',
-              }}
-            >
-              {item.label}
-            </button>
+            />
           ))}
         </div>
       </div>
@@ -406,6 +419,7 @@ export default function ModuleHistoryPage({ moduleKey, defaultFilter = 'all' }) 
               <button
                 key={item.siteId}
                 type="button"
+                data-site-id={item.siteId}
                 onClick={() => navigate(config.detailRoute(item.siteId))}
                 style={{
                   width: '100%',
