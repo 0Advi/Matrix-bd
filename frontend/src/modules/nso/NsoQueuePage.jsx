@@ -1,10 +1,12 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader, { HeaderTag } from '../shared/page-header/PageHeader.jsx';
 import Icon from '../shared/primitives/Icon.jsx';
+import StateKpiTile from '../shared/primitives/StateKpiTile.jsx';
 import { getNsoQueue } from '../../services/api/nsoApi.js';
 import { nsoSiteRoute } from '../../router/routes.js';
 import { useSiteDataRefresh } from '../../hooks/useSiteDataRefresh.js';
+import { useFocusSite } from '../../hooks/useFocusSite.js';
 
 const STATUS_LABELS = {
   pending: 'Pending',
@@ -12,8 +14,23 @@ const STATUS_LABELS = {
   stage_two: 'Licenses',
   stage_three: 'Launch',
   final_review: 'Final review',
+  final: 'Final review',
   complete: 'Complete',
+  done: 'Complete',
 };
+
+// Normalize a queue row to one canonical stage bucket. The backend emits
+// current_stage ∈ stage_one|stage_two|stage_three|final|done (with nso_status
+// pending|in_progress|complete); older callers used final_review/complete.
+function stageOf(row) {
+  const s = row.currentStage;
+  if (row.nsoStatus === 'complete' || s === 'done' || s === 'complete') return 'complete';
+  if (s === 'final' || s === 'final_review') return 'final_review';
+  if (s === 'stage_three') return 'stage_three';
+  if (s === 'stage_two') return 'stage_two';
+  if (s === 'pending' || s == null || s === '') return 'pending';
+  return 'stage_one';
+}
 
 function pretty(value) {
   if (value == null || value === '') return 'Pending';
@@ -42,63 +59,38 @@ function StatusPill({ value, tone = 'var(--zm-accent)' }) {
   );
 }
 
-function metricCard(label, value, detail, icon, tone = 'var(--zm-accent)') {
-  return (
-    <div className="zm-glass" style={{
-      display: 'flex',
-      gap: 12,
-      alignItems: 'center',
-      padding: 16,
-      borderRadius: 12,
-    }}>
-      <span style={{
-        width: 36,
-        height: 36,
-        borderRadius: 9,
-        display: 'grid',
-        placeItems: 'center',
-        color: tone,
-        background: 'var(--zm-surface-2)',
-        border: '1px solid var(--zm-line)',
-      }}>
-        <Icon name={icon} size={17}/>
-      </span>
-      <span>
-        <strong style={{
-          display: 'block',
-          fontFamily: 'var(--zm-font-mono)',
-          fontSize: 24,
-          lineHeight: 1,
-          color: 'var(--zm-fg)',
-          fontVariantNumeric: 'tabular-nums',
-        }}>
-          {String(value).padStart(2, '0')}
-        </strong>
-        <span style={{
-          display: 'block',
-          marginTop: 4,
-          color: 'var(--zm-fg)',
-          fontWeight: 850,
-          fontSize: 12.5,
-        }}>
-          {label}
-        </span>
-        <span style={{
-          display: 'block',
-          marginTop: 2,
-          color: 'var(--zm-fg-3)',
-          fontSize: 12,
-        }}>
-          {detail}
-        </span>
-      </span>
-    </div>
-  );
-}
+// Tile filter groups: each KPI tile scopes the queue to a set of stages.
+const TILE_STAGES = {
+  property: ['pending', 'stage_one'],
+  licenses: ['stage_two', 'stage_three', 'final_review'],
+  complete: ['complete'],
+};
+
+// Map a `?filter=<stage>` query value to the tile that covers that stage.
+// Accepts the backend aliases (final/done) as well as the canonical keys.
+const STAGE_TO_TILE = {
+  ...Object.fromEntries(
+    Object.entries(TILE_STAGES).flatMap(([tile, stages]) => stages.map((s) => [s, tile])),
+  ),
+  final: 'licenses',
+  done: 'complete',
+};
 
 export default function NsoQueuePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [state, setState] = React.useState({ status: 'loading', items: [], total: 0, error: null });
+  // 'all' | 'property' | 'licenses' | 'complete' — KPI tile filter.
+  const [filter, setFilter] = React.useState('all');
+  const focusId = useFocusSite();
+
+  // HashRouter: query params live in the hash — always read via useLocation.
+  const filterParam = new URLSearchParams(location.search).get('filter');
+  React.useEffect(() => {
+    if (!filterParam) return;
+    const tile = STAGE_TO_TILE[filterParam];
+    if (tile) setFilter(tile);
+  }, [filterParam]);
 
   const load = React.useCallback(() => {
     let cancelled = false;
@@ -123,11 +115,31 @@ export default function NsoQueuePage() {
   React.useEffect(() => load(), [load]);
   useSiteDataRefresh(load, { sources: ['nso', 'project', 'businessAdmin', 'payment', 'siteTrackerApi'] });
 
+  // useFocusSite polls only ~6s after mount; the queue endpoint can be slower
+  // than that. Once rows are actually in the DOM, re-run the scroll + flash so
+  // a ?focus= deep link still lands on its row (once per focus id, so
+  // background data refreshes don't keep yanking the scroll position).
+  const focusedRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!focusId || state.status !== 'ready' || focusedRef.current === focusId) return undefined;
+    const t = setTimeout(() => {
+      const esc = window.CSS?.escape ? window.CSS.escape(focusId) : focusId.replace(/"/g, '\\"');
+      const el = document.querySelector(`[data-site-id="${esc}"]`);
+      if (!el) return;
+      focusedRef.current = focusId;
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el.classList.add('zm-focus-target');
+      setTimeout(() => el.classList.remove('zm-focus-target'), 2600);
+    }, 150);
+    return () => clearTimeout(t);
+  }, [focusId, state.status]);
+
   const open = (row) => navigate(nsoSiteRoute(row.siteId));
-  const stageOne = state.items.filter((item) => item.currentStage === 'stage_one').length;
-  const stageTwo = state.items.filter((item) => item.currentStage === 'stage_two').length;
-  const stageThree = state.items.filter((item) => item.currentStage === 'stage_three').length;
-  const complete = state.items.filter((item) => item.nsoStatus === 'complete').length;
+  const countFor = (tile) => state.items.filter((item) => TILE_STAGES[tile].includes(stageOf(item))).length;
+  const toggleTile = (tile) => setFilter((f) => (f === tile ? 'all' : tile));
+  const visibleItems = filter === 'all'
+    ? state.items
+    : state.items.filter((item) => TILE_STAGES[filter].includes(stageOf(item)));
   const COLS = '120px minmax(220px, 1fr) 130px 150px 150px 160px 110px';
 
   return (
@@ -140,11 +152,11 @@ export default function NsoQueuePage() {
         right={<HeaderTag icon="home" label="OPENING READINESS"/>}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-        {metricCard('In NSO', state.total, 'Finance / CA ready', 'home')}
-        {metricCard('Property', stageOne, 'Stage 1 open', 'file', 'var(--zm-accent)')}
-        {metricCard('Licenses / launch', stageTwo + stageThree, 'Active downstream checks', 'shield', 'var(--zm-copper)')}
-        {metricCard('Completed', complete, 'Final sign-off done', 'check', 'var(--zm-success)')}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <StateKpiTile label="In NSO" value={state.total} sub="Finance / CA ready" color="var(--zm-accent)" active={filter === 'all'} onClick={() => setFilter('all')}/>
+        <StateKpiTile label="Property" value={countFor('property')} sub="Stage 1 open" color="var(--zm-info)" active={filter === 'property'} onClick={() => toggleTile('property')}/>
+        <StateKpiTile label="Licenses / launch" value={countFor('licenses')} sub="Active downstream checks" color="var(--zm-copper)" active={filter === 'licenses'} onClick={() => toggleTile('licenses')}/>
+        <StateKpiTile label="Completed" value={countFor('complete')} sub="Final sign-off done" color="var(--zm-success)" active={filter === 'complete'} onClick={() => toggleTile('complete')}/>
       </div>
 
       {state.status === 'loading' && (
@@ -193,9 +205,10 @@ export default function NsoQueuePage() {
             <span style={{ textAlign: 'right' }}>Action</span>
           </div>
 
-          {state.items.map((row) => (
+          {visibleItems.map((row) => (
             <div
               key={row.siteId}
+              data-site-id={row.siteId}
               onClick={() => open(row)}
               style={{
                 display: 'grid',
@@ -246,6 +259,11 @@ export default function NsoQueuePage() {
               </button>
             </div>
           ))}
+          {visibleItems.length === 0 && (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-body)', fontSize: 13 }}>
+              No NSO sites match this filter.
+            </div>
+          )}
         </div>
       )}
     </div>
