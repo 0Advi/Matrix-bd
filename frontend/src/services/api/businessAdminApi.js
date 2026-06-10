@@ -53,7 +53,10 @@ export async function getFinanceQueue() {
       .filter((r) => r.finance_status === 'awaiting_admin')
       .map((r) => ({
         siteId: r.site_id, siteCode: r.site_code, siteName: r.site_name, city: r.city,
-        caCode: r.ca_code, financeAmount: num(r.finance_amount), submittedByName: r.submitted_by_name,
+        caCode: r.ca_code,
+        kycVerified: Boolean(r.kyc_verified),
+        financeAmount: num(r.finance_amount),
+        submittedByName: r.submitted_by_name,
       })),
     total: arr.length,
   };
@@ -77,7 +80,12 @@ export async function getBudgetQueue() {
   return {
     items: (d.items || []).map((r) => ({
       siteId: r.site_id, siteCode: r.site_code, siteName: r.site_name, city: r.city,
-      budgetTotal: num(r.budget_total), submittedByName: r.submitted_by_name,
+      budgetStatus: r.budget_status,
+      budgetTotal: num(r.budget_total),
+      totalIndoorAreaSqft: num(r.total_indoor_area_sqft),
+      totalAreaSqft: num(r.total_area_sqft),
+      covers: num(r.covers),
+      submittedByName: r.submitted_by_name,
     })),
     total: d.total ?? 0,
   };
@@ -91,17 +99,25 @@ export async function reviewBudget(siteId, { decision, comments, initializationD
   return client.post(`/project/${siteId}/budget/admin-review`, body).then((r) => r.data);
 }
 
-// Full budget breakdown for the approval drawer — 11 investment heads, total,
-// and the (distinct-but-related) area / cover inputs that drive the metrics.
-// GET /project/{site_id} is tenant-scoped, not role-gated, so the admin reads it.
+// Full budget breakdown for the approval drawer — Business Admin-safe detail
+// route, separate from the active Project module route.
 export async function fetchBudgetDetail(siteId) {
-  const d = await client.get(`/project/${siteId}`).then((r) => r.data);
+  const d = await client.get(`/project/budget-admin-detail/${siteId}`).then((r) => r.data);
   return {
+    siteId: d.site_id,
+    siteCode: d.site_code,
+    siteName: d.site_name,
+    city: d.city,
+    submittedByName: d.submitted_by_name,
+    budgetStatus: d.budget_status,
     items: (d.budget_items || []).map((r) => ({ idx: r.idx, label: r.label, amount: num(r.amount) })),
     budgetTotal: num(d.budget_total),
     totalIndoorAreaSqft: num(d.total_indoor_area_sqft),
     totalAreaSqft: num(d.total_area_sqft),
     covers: num(d.covers),
+    budgetSupervisorComments: d.budget_supervisor_comments,
+    budgetAdminComments: d.budget_admin_comments,
+    updatedAt: d.updated_at,
   };
 }
 

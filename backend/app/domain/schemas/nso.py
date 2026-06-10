@@ -44,6 +44,35 @@ class NsoHistoryResponse(NsoQueueResponse):
     pass
 
 
+class NsoPropertySnapshot(BaseModel):
+    site_name: str
+    site_code: str
+    city: str
+    visit_date: Optional[date] = None
+    model: Optional[str] = None
+    google_maps_pin: Optional[str] = None
+    google_maps_url: Optional[str] = None
+    ca_code: Optional[str] = None
+    finance_amount: Optional[float] = None
+    kyc_verified: bool = False
+    rent_type: Optional[str] = None
+    expected_rent: Optional[float] = None
+    expected_revshare_pct: Optional[float] = None
+    expected_escalation_pct: Optional[float] = None
+    expected_escalation_years: Optional[int] = None
+    score: Optional[float] = None
+    estimated_monthly_sales: Optional[float] = None
+    carpet_area_sqft: Optional[float] = None
+    cam_charges: Optional[float] = None
+    security_deposit: Optional[float] = None
+    brokerage: Optional[float] = None
+    lock_in_months: Optional[int] = None
+    tenure_months: Optional[int] = None
+    rent_free_days: Optional[int] = None
+    nearest_starbucks_m: Optional[int] = None
+    nearest_twc_m: Optional[int] = None
+
+
 class NsoStateResponse(BaseModel):
     site_id: str
     site_code: str
@@ -65,6 +94,7 @@ class NsoStateResponse(BaseModel):
     current_stage: str
     triggers: list[NsoTriggerState] = Field(default_factory=list)
 
+    property_snapshot: NsoPropertySnapshot
     property_details: Optional[str] = None
     communication_floated: Optional[bool] = None
 
@@ -90,7 +120,7 @@ class NsoStateResponse(BaseModel):
 
 
 class NsoStageOneRequest(BaseModel):
-    property_details: str = Field(min_length=1, max_length=2000)
+    property_details: Optional[str] = Field(default=None, max_length=2000)
     communication_floated: bool
 
 

@@ -41,6 +41,10 @@ class ProjectQueueItem(BaseModel):
     quality_audit_status: str = "pending"
     allocated_to_name: Optional[str] = None
     submitted_by_name: Optional[str] = None
+    budget_total: Optional[float] = None
+    total_indoor_area_sqft: Optional[float] = None
+    total_area_sqft: Optional[float] = None
+    covers: Optional[int] = None
 
 
 class ProjectQueueResponse(BaseModel):

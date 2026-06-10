@@ -157,6 +157,13 @@ async def _queue_item(
         quality_audit_status=(review.quality_audit_status if review else "pending"),
         allocated_to_name=(delegate[1] if delegate else None),
         submitted_by_name=submitted_by_name,
+        budget_total=float(review.budget_total) if review and review.budget_total is not None else None,
+        total_indoor_area_sqft=(
+            float(review.total_indoor_area_sqft)
+            if review and review.total_indoor_area_sqft is not None else None
+        ),
+        total_area_sqft=float(review.total_area_sqft) if review and review.total_area_sqft is not None else None,
+        covers=int(review.covers) if review and review.covers is not None else None,
     )
 
 
@@ -421,6 +428,25 @@ async def svc_get_project_history_detail(
             quality_audit_status="pending",
         )
         review.updated_at = site.updated_at
+    return await _build_response(session, site, review)
+
+
+async def svc_get_project_budget_admin_detail(
+    session: AsyncSession, *, tenant_id: str | UUID, site_id: str | UUID,
+) -> ProjectStateResponse:
+    """Read-only project budget detail for Business Admin approval.
+
+    Business admins approve budget submissions, but they are not Project module
+    workers. This route gives them the same submitted budget context without
+    using the active Project detail route or mutating project state.
+    """
+    site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
+    review = await _fetch_review_or_none(session, site_id=site.id)
+    if review is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="Project budget details are not available for this site.",
+        )
     return await _build_response(session, site, review)
 
 
