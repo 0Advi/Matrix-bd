@@ -10,7 +10,7 @@ import AddDetailsPage from '../../loi/details/AddDetailsPage.jsx';
 import * as siteService from '../../../services/api/siteService.js';
 import { listMyTeam } from '../../../services/api/adapters/httpAdapter.js';
 import { useFocusSite } from '../../../hooks/useFocusSite.js';
-import SubFilterPill from '../../shared/primitives/SubFilterPill.jsx';
+import StateKpiTile from '../../shared/primitives/StateKpiTile.jsx';
 import { STAGES } from '../../shared/primitives/constants.js';
 
 // All render bodies preserved exactly from Shortlist.jsx.
@@ -424,14 +424,16 @@ export default function ShortlistPage({ onOpenSite: onOpenSiteProp, showToast: s
         lede={`${visibleShortlist.length} site${visibleShortlist.length === 1 ? '' : 's'}`}
         right={<HeaderTag icon="clock" label="OLDEST FIRST"/>}
       />
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <SubFilterPill
-          label="Awaiting details" count={awaitingDetails.length} color={STAGES.staging.color}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <StateKpiTile
+          label="Awaiting details" value={awaitingDetails.length} color={STAGES.staging.color}
+          sub="17-field form not submitted yet"
           active={stateFilter === 'awaiting'}
           onClick={() => setStateFilter(f => f === 'awaiting' ? 'all' : 'awaiting')}
         />
-        <SubFilterPill
-          label="Pending approval" count={pendingApproval.length} color={STAGES.inReview.color}
+        <StateKpiTile
+          label="Pending approval" value={pendingApproval.length} color={STAGES.inReview.color}
+          sub="in review · awaiting supervisor"
           active={stateFilter === 'pending'}
           onClick={() => setStateFilter(f => f === 'pending' ? 'all' : 'pending')}
         />

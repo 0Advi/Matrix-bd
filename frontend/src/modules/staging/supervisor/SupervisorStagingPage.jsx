@@ -7,7 +7,7 @@ import Icon from '../../shared/primitives/Icon.jsx';
 import StatusPill from '../../shared/primitives/StatusPill.jsx';
 import { bdSiteStatusRoute } from '../../../router/routes.js';
 import { useFocusSite } from '../../../hooks/useFocusSite.js';
-import SubFilterPill from '../../shared/primitives/SubFilterPill.jsx';
+import StateKpiTile from '../../shared/primitives/StateKpiTile.jsx';
 import { STAGES } from '../../shared/primitives/constants.js';
 
 // Render bodies preserved exactly from Staging.jsx — supervisor-only view.
@@ -148,9 +148,9 @@ export default function SupervisorStagingPage({ onOpenSite: onOpenSiteProp, show
         right={<HeaderTag icon="check" label="ON TRACK"/>}
       />
       <StagingKpiStripSupervisor sites={visibleStaging}/>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <SubFilterPill label="Awaiting LOI" count={awaitingLoi.length} color={STAGES.staging.color} active={subState === 'awaiting_loi'} onClick={() => setSubState(s => s === 'awaiting_loi' ? 'all' : 'awaiting_loi')}/>
-        <SubFilterPill label="Awaiting approval" count={awaitingApproval.length} color={STAGES.uploaded.color} active={subState === 'awaiting_approval'} onClick={() => setSubState(s => s === 'awaiting_approval' ? 'all' : 'awaiting_approval')}/>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <StateKpiTile label="Awaiting LOI" value={awaitingLoi.length} color={STAGES.staging.color} sub="no LOI uploaded yet" active={subState === 'awaiting_loi'} onClick={() => setSubState(s => s === 'awaiting_loi' ? 'all' : 'awaiting_loi')}/>
+        <StateKpiTile label="Awaiting approval" value={awaitingApproval.length} color={STAGES.uploaded.color} sub="LOI uploaded · push to Legal" active={subState === 'awaiting_approval'} onClick={() => setSubState(s => s === 'awaiting_approval' ? 'all' : 'awaiting_approval')}/>
       </div>
       <StagingFilterBar filters={filters} onFilters={setFilters} sites={visibleStaging}/>
       <div className="zm-glass" style={{ borderRadius: 16, overflow: 'hidden' }}>
