@@ -2,6 +2,7 @@ import React from 'react';
 import PageHeader, { HeaderTag } from '../shared/page-header/PageHeader.jsx';
 import Icon from '../shared/primitives/Icon.jsx';
 import { usePageContext } from '../../App.jsx';
+import { useFocusSite } from '../../hooks/useFocusSite.js';
 import {
   listPendingChangeRequests,
   approveChangeRequest,
@@ -26,6 +27,7 @@ function StatusPill({ value }) {
 
 export default function ChangeRequestsPage() {
   const { showToast } = usePageContext();
+  useFocusSite();
   const [state, setState] = React.useState({ status: 'loading', items: [], total: 0, error: null });
   const [busy, setBusy] = React.useState(null);
 
@@ -107,7 +109,7 @@ export default function ChangeRequestsPage() {
             <span style={{ textAlign: 'right' }}>Action</span>
           </div>
           {state.items.map((cr) => (
-            <div key={cr.id} style={{
+            <div key={cr.id} data-site-id={cr.siteId} style={{
               display: 'grid',
               gridTemplateColumns: 'minmax(180px,1fr) minmax(220px,1.2fr) 140px 100px 220px',
               gap: 12, padding: '14px 16px',
