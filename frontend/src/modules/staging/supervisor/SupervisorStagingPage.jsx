@@ -26,19 +26,18 @@ function KpiTile({ label, value, sub, tone = 'neutral' }) {
 
 function StagingKpiStripSupervisor({ sites }) {
   const uploaded = sites.filter(s => s.loiUploaded);
-  const awaitingUpload = sites.filter(s => !s.loiUploaded);
   const draftToLoiDays = uploaded.map(s => daysBetweenISO(s.draftDate, s.loiUploadedAt)).filter(n => Number.isFinite(n));
   const medDraftToLoi = median(draftToLoiDays);
   const onTime = uploaded.filter(s => (s.daysToLOI ?? 0) <= s.expectedLoiDays).length;
   const late = uploaded.filter(s => (s.daysToLOI ?? 0) > s.expectedLoiDays).length;
   const hitRate = uploaded.length ? Math.round((onTime / uploaded.length) * 100) : null;
   if (sites.length === 0) return null;
+  // "LOIs awaiting legal" / "Awaiting LOI" used to live here as static tiles;
+  // they are now the clickable StateKpiTile filters rendered below the strip.
   return (
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
       <KpiTile label="Median · draft → LOI" value={medDraftToLoi == null ? '—' : `${medDraftToLoi}d`} sub={uploaded.length ? `${uploaded.length} LOI${uploaded.length === 1 ? '' : 's'} uploaded` : 'no LOIs yet'}/>
       <KpiTile label="LOI on-time rate" value={hitRate == null ? '—' : `${hitRate}%`} sub={uploaded.length ? `${onTime} on time · ${late} late` : 'pending uploads'} tone={hitRate == null ? 'neutral' : hitRate >= 80 ? 'good' : hitRate >= 50 ? 'warn' : 'bad'}/>
-      <KpiTile label="LOIs awaiting legal" value={String(uploaded.filter(s => !s.pushed).length).padStart(2,'0')} sub="ready for Legal review"/>
-      <KpiTile label="Awaiting LOI" value={String(awaitingUpload.length).padStart(2,'0')} sub="assigned executive action" tone={awaitingUpload.length > 0 ? 'warn' : 'neutral'}/>
     </div>
   );
 }
