@@ -1,7 +1,9 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader, { HeaderTag } from '../shared/page-header/PageHeader.jsx';
 import Icon from '../shared/primitives/Icon.jsx';
+import SubFilterPill from '../shared/primitives/SubFilterPill.jsx';
+import { useFocusSite } from '../../hooks/useFocusSite.js';
 import { useSession } from '../../state/SessionContext.jsx';
 import { getLegalQueue } from '../../services/api/legalApi.js';
 import { listLegalDelegationsForSite } from '../../services/api/legalDelegationApi.js';
@@ -54,10 +56,32 @@ function StagePill({ value }) {
   );
 }
 
+const DD_FILTERS = ['pending', 'in_review', 'positive', 'negative'];
+
+const FILTER_PILLS = {
+  pending:   { label: 'DD Pending', color: 'var(--zm-fg-3)' },
+  in_review: { label: 'In review',  color: 'var(--zm-accent)' },
+  positive:  { label: 'Positive',   color: 'var(--zm-success)' },
+  negative:  { label: 'Negative',   color: 'var(--zm-danger)' },
+};
+
 export default function LegalQueuePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { role } = useSession();
   const isSupervisor = role === 'supervisor';
+  useFocusSite();
+  // Optional ?filter= deep link (HashRouter — query lives inside the hash, so
+  // read it from react-router's location, never window.location.search).
+  const filterParam = new URLSearchParams(location.search).get('filter');
+  const [ddFilter, setDdFilter] = React.useState(() => (
+    DD_FILTERS.includes(filterParam) ? filterParam : 'all'
+  ));
+  // Re-apply when an in-page navigation changes the param (no remount on
+  // same-route navigations).
+  React.useEffect(() => {
+    if (DD_FILTERS.includes(filterParam)) setDdFilter(filterParam);
+  }, [filterParam]);
   const [state, setState] = React.useState({ status: 'loading', items: [], total: 0, error: null });
   // siteId -> delegate name string (supervisor view only)
   const [delegateNames, setDelegateNames] = React.useState({});
@@ -117,6 +141,18 @@ export default function LegalQueuePage() {
     return agreementAllowsLicensing(row.agreementStatus) ? 'Open licensing' : 'Open agreement';
   };
 
+  const filterCounts = React.useMemo(() => {
+    const counts = { pending: 0, in_review: 0, positive: 0, negative: 0 };
+    for (const row of state.items) {
+      if (counts[row.legalDdStatus] != null) counts[row.legalDdStatus] += 1;
+    }
+    return counts;
+  }, [state.items]);
+
+  const visibleItems = ddFilter === 'all'
+    ? state.items
+    : state.items.filter((row) => row.legalDdStatus === ddFilter);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <PageHeader
@@ -146,6 +182,21 @@ export default function LegalQueuePage() {
       )}
 
       {state.status === 'ready' && state.items.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {DD_FILTERS.map((status) => (
+            <SubFilterPill
+              key={status}
+              label={FILTER_PILLS[status].label}
+              count={filterCounts[status]}
+              color={FILTER_PILLS[status].color}
+              active={ddFilter === status}
+              onClick={() => setDdFilter((f) => (f === status ? 'all' : status))}
+            />
+          ))}
+        </div>
+      )}
+
+      {state.status === 'ready' && state.items.length > 0 && (
         <div className="zm-glass" style={{ borderRadius: 12, overflow: 'hidden' }}>
           <div style={{
             display: 'grid',
@@ -162,9 +213,11 @@ export default function LegalQueuePage() {
             <span style={{ textAlign: 'right' }}>Action</span>
           </div>
 
-          {state.items.map((row) => (
+          {visibleItems.map((row) => (
             <div
               key={row.siteId}
+              data-site-id={row.siteId}
+              className="zm-row"
               onClick={() => open(row)}
               style={{
                 display: 'grid',
@@ -220,6 +273,11 @@ export default function LegalQueuePage() {
               </button>
             </div>
           ))}
+          {visibleItems.length === 0 && (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--zm-fg-3)', fontFamily: 'var(--zm-font-body)', fontSize: 13 }}>
+              No sites match this DD status filter.
+            </div>
+          )}
         </div>
       )}
     </div>
