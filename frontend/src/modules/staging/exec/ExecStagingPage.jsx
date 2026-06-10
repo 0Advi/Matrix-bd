@@ -7,6 +7,8 @@ import PageHeader, { HeaderTag } from '../../shared/page-header/PageHeader.jsx';
 import Icon from '../../shared/primitives/Icon.jsx';
 import StatusPill from '../../shared/primitives/StatusPill.jsx';
 import { useFocusSite } from '../../../hooks/useFocusSite.js';
+import SubFilterPill from '../../shared/primitives/SubFilterPill.jsx';
+import { STAGES } from '../../shared/primitives/constants.js';
 
 // Render bodies preserved exactly from Staging.jsx — exec-only view.
 
@@ -105,7 +107,15 @@ export default function ExecStagingPage({ onOpenSite: onOpenSiteProp, showToast:
   const [filters, setFilters] = React.useState({ q: '', city: 'All', month: 'All', status: 'all' });
 
   const visibleStaging = filterByScope(staging, role, user);
-  const filtered = applyStagingFilters(visibleStaging, filters);
+  // Sub-state indicators: Awaiting LOI = no upload yet; Awaiting approval =
+  // LOI uploaded, waiting on the supervisor push to Legal/Payments.
+  const [subState, setSubState] = React.useState('all'); // all | awaiting_loi | awaiting_approval
+  const awaitingLoi = visibleStaging.filter(s => !s.loiUploaded && !s.pushed);
+  const awaitingApproval = visibleStaging.filter(s => s.loiUploaded && !s.pushed);
+  const filtered = applyStagingFilters(visibleStaging, filters).filter(s =>
+    subState === 'awaiting_loi' ? (!s.loiUploaded && !s.pushed) :
+    subState === 'awaiting_approval' ? (s.loiUploaded && !s.pushed) : true,
+  );
   const overdueCount = visibleStaging.filter(s => s.daysSinceApproval > s.expectedLoiDays && !s.loiUploaded).length;
 
   const onUpload = async (site, file) => {
@@ -124,6 +134,10 @@ export default function ExecStagingPage({ onOpenSite: onOpenSiteProp, showToast:
         right={overdueCount > 0 ? <HeaderTag icon="alert" label={`${overdueCount} OVERDUE`} tone="accent"/> : <HeaderTag icon="check" label="ON TRACK"/>}
       />
       <StagingKpiStrip sites={visibleStaging}/>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <SubFilterPill label="Awaiting LOI" count={awaitingLoi.length} color={STAGES.staging.color} active={subState === 'awaiting_loi'} onClick={() => setSubState(s => s === 'awaiting_loi' ? 'all' : 'awaiting_loi')}/>
+        <SubFilterPill label="Awaiting approval" count={awaitingApproval.length} color={STAGES.uploaded.color} active={subState === 'awaiting_approval'} onClick={() => setSubState(s => s === 'awaiting_approval' ? 'all' : 'awaiting_approval')}/>
+      </div>
       <StagingFilterBar filters={filters} onFilters={setFilters} sites={visibleStaging}/>
       <div className="zm-glass" style={{ borderRadius: 16, overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>

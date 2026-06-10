@@ -366,9 +366,11 @@ export default function OverviewPage({ onOpenSite: onOpenSiteProp }) {
   // view: which KPI is expanded in place (payments / launch navigate away).
   const [view, setView] = React.useState(null); // null | 'sites' | 'archived'
   const [stage, setStage] = React.useState('all');
-  // Shortlist sub-state filter (expanded Total sites view, Shortlist selected):
-  // 'awaiting' = needs the 17-field form; 'pending' = in supervisor review.
-  const [shortlistSub, setShortlistSub] = React.useState('all');
+  // Sub-state filter inside the expanded Total sites view. Shortlist:
+  // 'awaiting' (needs the 17-field form) | 'pending' (in supervisor review).
+  // Sites in process: 'awaiting_loi' (no upload yet) | 'awaiting_approval'
+  // (LOI uploaded, waiting on the supervisor push).
+  const [subFilter, setSubFilter] = React.useState('all');
   const [advanced, setAdvanced] = React.useState({ month: '', preset: '', from: '', to: '' });
   const [search, setSearch] = React.useState('');
   // Archived view has its own filters (calendar on archived-on date + search).
@@ -437,10 +439,14 @@ export default function OverviewPage({ onOpenSite: onOpenSiteProp }) {
     if (stage === 'shortlist') return ['shortlist','inReview'].includes(r.stage);
     return r.stage === stage;
   });
-  const shortlistSubFiltered = (view === 'sites' && stage === 'shortlist' && shortlistSub !== 'all')
-    ? stageFiltered.filter(r => r.stage === (shortlistSub === 'pending' ? 'inReview' : 'shortlist'))
+  const subFiltered = (view === 'sites' && subFilter !== 'all')
+    ? stageFiltered.filter(r => {
+        if (stage === 'shortlist') return r.stage === (subFilter === 'pending' ? 'inReview' : 'shortlist');
+        if (stage === 'staging') return subFilter === 'awaiting_loi' ? ['staging', 'overdue'].includes(r.stage) : r.stage === 'uploaded';
+        return true;
+      })
     : stageFiltered;
-  const filteredMotion = shortlistSubFiltered
+  const filteredMotion = subFiltered
     .filter(r => matchesAdvanced(r.when, advanced))
     .filter(r => matchesSearch(needle, r.code || '', r.name || '', r.city || '', r.owner || ''));
 
@@ -465,7 +471,7 @@ export default function OverviewPage({ onOpenSite: onOpenSiteProp }) {
     if (key === 'launch') { navigate(ROUTES.LAUNCH); return; }
     setView(v => (v === key ? null : key));
     setStage('all');
-    setShortlistSub('all');
+    setSubFilter('all');
     setSearch('');
   };
 
@@ -509,20 +515,24 @@ export default function OverviewPage({ onOpenSite: onOpenSiteProp }) {
         <>
           <div className="zm-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 18 }}>
             <MetricCard no="Ⅰ" eyebrow="Total sites" value={metrics.total.value} rule="var(--zm-accent)" delta={metrics.total.delta} sub={metrics.total.sub} selected onClick={() => selectKpi('sites')}/>
-            <BigFilterBox label="Draft"            value={visibleDrafts.length}    color={STAGES.draft.color}     active={stage === 'draft'}     onClick={() => { setShortlistSub('all'); setStage(s => s === 'draft' ? 'all' : 'draft'); }}/>
-            <BigFilterBox label="Shortlist"        value={visibleShortlist.length} color={STAGES.shortlist.color} active={stage === 'shortlist'} onClick={() => { setShortlistSub('all'); setStage(s => s === 'shortlist' ? 'all' : 'shortlist'); }}/>
-            <BigFilterBox label="Sites in process" value={activeStaging.length}    color={STAGES.staging.color}   active={stage === 'staging'}   onClick={() => { setShortlistSub('all'); setStage(s => s === 'staging' ? 'all' : 'staging'); }}/>
+            <BigFilterBox label="Pipeline"         value={visibleDrafts.length}    color={STAGES.draft.color}     active={stage === 'draft'}     onClick={() => { setSubFilter('all'); setStage(s => s === 'draft' ? 'all' : 'draft'); }}/>
+            <BigFilterBox label="Shortlist"        value={visibleShortlist.length} color={STAGES.shortlist.color} active={stage === 'shortlist'} onClick={() => { setSubFilter('all'); setStage(s => s === 'shortlist' ? 'all' : 'shortlist'); }}/>
+            <BigFilterBox label="Sites in process" value={activeStaging.length}    color={STAGES.staging.color}   active={stage === 'staging'}   onClick={() => { setSubFilter('all'); setStage(s => s === 'staging' ? 'all' : 'staging'); }}/>
           </div>
-          {stage === 'shortlist' && (
-            <div className="zm-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 18 }}>
-              <span/>
-              <BigFilterBox label="Awaiting details" value={visibleShortlist.filter(s => !s.inReview).length} color={STAGES.staging.color}  active={shortlistSub === 'awaiting'} onClick={() => setShortlistSub(s => s === 'awaiting' ? 'all' : 'awaiting')}/>
-              <BigFilterBox label="Pending approval" value={visibleShortlist.filter(s => s.inReview).length}  color={STAGES.inReview.color} active={shortlistSub === 'pending'}  onClick={() => setShortlistSub(s => s === 'pending' ? 'all' : 'pending')}/>
-              <span/>
-            </div>
-          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
             <SearchBox value={search} onChange={setSearch}/>
+            {stage === 'shortlist' && (
+              <>
+                <FilterChip label="Awaiting details" count={visibleShortlist.filter(s => !s.inReview).length} color={STAGES.staging.color}  active={subFilter === 'awaiting'} onClick={() => setSubFilter(s => s === 'awaiting' ? 'all' : 'awaiting')}/>
+                <FilterChip label="Pending approval" count={visibleShortlist.filter(s => s.inReview).length}  color={STAGES.inReview.color} active={subFilter === 'pending'}  onClick={() => setSubFilter(s => s === 'pending' ? 'all' : 'pending')}/>
+              </>
+            )}
+            {stage === 'staging' && (
+              <>
+                <FilterChip label="Awaiting LOI"      count={activeStaging.filter(s => !s.loiUploaded).length} color={STAGES.staging.color}  active={subFilter === 'awaiting_loi'}      onClick={() => setSubFilter(s => s === 'awaiting_loi' ? 'all' : 'awaiting_loi')}/>
+                <FilterChip label="Awaiting approval" count={activeStaging.filter(s => s.loiUploaded).length}  color={STAGES.uploaded.color} active={subFilter === 'awaiting_approval'} onClick={() => setSubFilter(s => s === 'awaiting_approval' ? 'all' : 'awaiting_approval')}/>
+              </>
+            )}
             <span style={{ flex: 1 }}/>
             <DateFilterButton value={advanced} onChange={setAdvanced}/>
           </div>

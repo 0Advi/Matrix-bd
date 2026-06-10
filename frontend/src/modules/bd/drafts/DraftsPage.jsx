@@ -175,7 +175,7 @@ export default function DraftsPage({ onOpenSite: onOpenSiteProp, showToast: show
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <PageHeader
         file="№ 02" eyebrow="Workflow · Pipeline"
-        title={<>Drafts</>}
+        title={<>Pipeline</>}
         lede={`${visibleDrafts.length} draft${visibleDrafts.length === 1 ? '' : 's'}`}
         right={overdueCount > 0 ? <HeaderTag icon="alert" label={`${overdueCount} PAST SLA`} tone="accent"/> : <HeaderTag icon="check" label="SLA CLEAR"/>}
       />
