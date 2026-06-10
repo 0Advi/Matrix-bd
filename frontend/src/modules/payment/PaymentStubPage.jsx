@@ -5,6 +5,8 @@ import Icon from '../shared/primitives/Icon.jsx';
 import { listSites } from '../../services/api/siteService.js';
 import { ROUTES, siteTrackerDetailRoute } from '../../router/routes.js';
 import { useSiteDataRefresh } from '../../hooks/useSiteDataRefresh.js';
+import { useSession } from '../../state/SessionContext.jsx';
+import { filterByScope } from '../../rbac/scope.js';
 
 // Payments membership = sites pushed from "Sites in process". The push moves
 // site.status to legal_review, and Legal + Finance then run in parallel — so a
@@ -334,6 +336,11 @@ const FILTERS = ['all', 'pending', 'awaiting', 'approved'];
 export default function PaymentStubPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { role, user } = useSession();
+  // Executives only see Finance state for THEIR sites (submitted or assigned).
+  // The backend already scopes GET /sites for real executive JWTs; this also
+  // covers the mock adapter and the supervisor "View as" role switcher.
+  const isExec = role === 'exec' || role === 'executive';
   const initialFilter = (() => {
     const f = new URLSearchParams(location.search).get('filter');
     return FILTERS.includes(f) ? f : 'all';
@@ -350,8 +357,9 @@ export default function PaymentStubPage() {
     listSites({ status: PAYMENT_STATUSES })
       .then((sites) => {
         if (cancelled) return;
+        const visible = isExec ? filterByScope(sites || [], role, user) : (sites || []);
         const seen = new Set();
-        const cleanRows = (sites || [])
+        const cleanRows = visible
           .filter((site) => {
             if (!site?.id || seen.has(site.id)) return false;
             seen.add(site.id);
@@ -373,7 +381,7 @@ export default function PaymentStubPage() {
         });
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [isExec, role, user]);
 
   React.useEffect(() => load(), [load]);
   useSiteDataRefresh(load);

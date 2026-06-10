@@ -19,14 +19,19 @@ export function filterByScope(items, role, user) {
     const userName = String(user?.name || '');
     const userId = String(user?.id || user?.userId || '');
     return items.filter((item) => {
-      const createdBy = String(item.createdBy || '');
+      // createdBy is a plain name string on legacy page shapes, but an
+      // {id, name} object on canonical sites (Payments / Launch lists).
+      const createdBy = typeof item.createdBy === 'object'
+        ? String(item.createdBy?.name || '')
+        : String(item.createdBy || '');
+      const createdById = String(item.createdBy?.id || '');
       const submittedBy = String(item.submittedBy || '');
       const assignedToId = String(item.assignedToId || item.assignedTo?.id || '');
       const assignedToName = String(item.assignedToName || item.assignedTo?.name || '');
       return (
         createdBy === userName ||
         assignedToName === userName ||
-        (userId && (submittedBy === userId || assignedToId === userId))
+        (userId && (submittedBy === userId || assignedToId === userId || createdById === userId))
       );
     });
   }

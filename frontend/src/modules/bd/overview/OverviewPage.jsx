@@ -388,8 +388,13 @@ export default function OverviewPage({ onOpenSite: onOpenSiteProp }) {
   // the Payments KPI (Legal ∥ Finance run in parallel after the push).
   const activeStaging = visibleStaging.filter(s => !s.pushed);
 
-  const launchIds = new Set((launch.rows || []).map(r => r.id));
-  const paymentSites = sites.filter(s => PUSHED_STATUSES.includes(s.status) && !launchIds.has(s.id));
+  // Executives count only their own pushed/launch sites — mirrors the
+  // payments tab scoping (backend scopes real exec JWTs; this covers mock
+  // mode and the supervisor "View as" switcher).
+  const visibleLaunch = isExec ? filterByScope(launch.rows || [], role, user) : (launch.rows || []);
+  const launchIds = new Set(visibleLaunch.map(r => r.id));
+  const pushedSites = sites.filter(s => PUSHED_STATUSES.includes(s.status));
+  const paymentSites = (isExec ? filterByScope(pushedSites, role, user) : pushedSites).filter(s => !launchIds.has(s.id));
 
   const totalSites = visibleDrafts.length + visibleShortlist.length + activeStaging.length;
   const cityCount = new Set([...visibleDrafts.map(d => d.city), ...visibleShortlist.map(s => s.city), ...activeStaging.map(s => s.city)]).size;
@@ -415,7 +420,7 @@ export default function OverviewPage({ onOpenSite: onOpenSiteProp }) {
       sub: 'Pushed from Sites in process',
     },
     launch: {
-      value: launch.loading ? '··' : String(launch.rows.length).padStart(2, '0'),
+      value: launch.loading ? '··' : String(visibleLaunch.length).padStart(2, '0'),
       delta: launch.loading ? 'Loading…' : 'Project complete',
       deltaTone: launch.loading ? 'neutral' : 'pos',
       sub: 'Handed to NSO',

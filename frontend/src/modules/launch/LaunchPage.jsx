@@ -4,6 +4,8 @@ import PageHeader, { HeaderTag } from '../shared/page-header/PageHeader.jsx';
 import Avatar from '../shared/primitives/Avatar.jsx';
 import Icon from '../shared/primitives/Icon.jsx';
 import { useLaunchSites } from '../../hooks/useLaunchSites.js';
+import { useSession } from '../../state/SessionContext.jsx';
+import { filterByScope } from '../../rbac/scope.js';
 
 // LaunchPage — BD-facing list of sites that completed the Project module and
 // were handed to NSO for launch (tracker projectStatus === 'done'). Reached
@@ -30,9 +32,15 @@ function inRange(iso, from, to) {
 
 export default function LaunchPage() {
   const { onOpenSite } = usePageContext();
-  const { rows, loading, error, refresh } = useLaunchSites();
+  const { role, user } = useSession();
+  const { rows: allRows, loading, error, refresh } = useLaunchSites();
   const [q, setQ] = React.useState('');
   const [range, setRange] = React.useState({ from: '', to: '' });
+
+  // Executives only see their own launch sites (backend scopes real exec
+  // JWTs; this also covers mock mode and the "View as" role switcher).
+  const isExec = role === 'exec' || role === 'executive';
+  const rows = isExec ? filterByScope(allRows, role, user) : allRows;
 
   const needle = q.trim().toLowerCase();
   const filtered = rows.filter((site) => {
