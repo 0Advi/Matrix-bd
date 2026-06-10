@@ -338,7 +338,12 @@ export default function ModuleHistoryPage({ moduleKey, defaultFilter = 'all' }) 
           return;
         }
         const audit = auditRes.status === 'fulfilled' ? (auditRes.value?.items || []) : [];
-        setDetailState({ status: 'ready', detail: detailRes.value, audit, error: null });
+        // Distinguish "audit fetch failed" from "genuinely no activity" — a
+        // swallowed failure used to render the misleading empty-state copy.
+        const auditError = auditRes.status === 'rejected'
+          ? (auditRes.reason?.detail || auditRes.reason?.message || 'Audit trail unavailable.')
+          : null;
+        setDetailState({ status: 'ready', detail: detailRes.value, audit, auditError, error: null });
       });
     return () => { cancelled = true; };
   }, [config, siteId]);
@@ -481,7 +486,9 @@ export default function ModuleHistoryPage({ moduleKey, defaultFilter = 'all' }) 
                 <div>
                   <h3 style={{ margin: '0 0 10px', fontSize: 15, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Audit trail</h3>
                   {detailState.audit.length === 0 ? (
-                    <div style={{ color: 'var(--zm-fg-3)' }}>No audit activity found for this site.</div>
+                    <div style={{ color: detailState.auditError ? 'var(--zm-danger)' : 'var(--zm-fg-3)' }}>
+                      {detailState.auditError || 'No audit activity found for this site.'}
+                    </div>
                   ) : (
                     <div style={{ display: 'grid', gap: 8 }}>
                       {detailState.audit.slice(0, 18).map((entry) => (

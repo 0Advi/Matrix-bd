@@ -94,19 +94,20 @@ export default function NsoQueuePage() {
 
   const load = React.useCallback(() => {
     let cancelled = false;
-    setState((prev) => ({ ...prev, status: 'loading', error: null }));
+    // Keep loaded rows on screen during refreshes; only the initial load
+    // shows the loading panel. A failed refresh keeps stale data + banner.
+    setState((prev) => ({ ...prev, status: prev.items.length ? prev.status : 'loading', error: null }));
     getNsoQueue()
       .then((data) => {
         if (!cancelled) setState({ status: 'ready', items: data.items, total: data.total, error: null });
       })
       .catch((err) => {
         if (!cancelled) {
-          setState({
-            status: 'error',
-            items: [],
-            total: 0,
+          setState((prev) => ({
+            ...prev,
+            status: prev.items.length ? 'ready' : 'error',
             error: err?.detail || err?.message || 'Failed to load NSO queue',
-          });
+          }));
         }
       });
     return () => { cancelled = true; };
@@ -165,7 +166,7 @@ export default function NsoQueuePage() {
         </div>
       )}
 
-      {state.status === 'error' && (
+      {state.error && (
         <div className="zm-glass" style={{ padding: 18, color: 'var(--zm-danger)' }}>
           {state.error}
         </div>
@@ -180,7 +181,7 @@ export default function NsoQueuePage() {
         </div>
       )}
 
-      {state.status === 'ready' && state.items.length > 0 && (
+      {state.items.length > 0 && (
         <div className="zm-glass" style={{ borderRadius: 12, overflow: 'hidden' }}>
           <div style={{
             display: 'grid',

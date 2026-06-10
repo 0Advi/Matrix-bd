@@ -135,8 +135,16 @@ def _budget_item_out(row: models.ProjectBudgetItem) -> ProjectBudgetItemOut:
 
 async def _queue_item(
     session: AsyncSession, site: models.Site, review: Optional[models.ProjectReview],
+    *, prefetched: Optional[dict] = None,
 ) -> ProjectQueueItem:
-    delegate = await _active_project_delegate(session, site_id=site.id)
+    # `prefetched` lets list endpoints batch the delegate/name lookups into two
+    # queries total instead of two per site (N+1 through pgBouncer/NullPool).
+    if prefetched is None:
+        delegate = await _active_project_delegate(session, site_id=site.id)
+        submitted_by_name = await fetch_user_name(session, site.submitted_by)
+    else:
+        delegate = prefetched.get("delegate")
+        submitted_by_name = prefetched.get("submitted_by_name")
     return ProjectQueueItem(
         site_id=str(site.id),
         site_code=site.ca_code or site.code or "",
@@ -148,7 +156,7 @@ async def _queue_item(
         budget_status=(review.budget_status if review else "draft"),
         quality_audit_status=(review.quality_audit_status if review else "pending"),
         allocated_to_name=(delegate[1] if delegate else None),
-        submitted_by_name=await fetch_user_name(session, site.submitted_by),
+        submitted_by_name=submitted_by_name,
     )
 
 
@@ -247,11 +255,21 @@ async def svc_project_queue(
     restrict_to_site_ids: Optional[list[str]] = None,
 ) -> ProjectQueueResponse:
     async with transaction(session):
+        # One joined query for sites+reviews (done-filter pushed into SQL), one
+        # batched delegate lookup, one batched name lookup — instead of the old
+        # 1 + 3N round trips with INSERT flushes on a GET. Reviews are no
+        # longer created here: every write path uses _fetch_review_or_create,
+        # and _queue_item already renders sensible defaults for review=None.
         stmt = (
-            select(models.Site)
+            select(models.Site, models.ProjectReview)
+            .outerjoin(models.ProjectReview, models.ProjectReview.site_id == models.Site.id)
             .where(
                 models.Site.tenant_id == tenant_id,
                 models.Site.design_status == "approved",
+                or_(
+                    models.ProjectReview.project_status.is_(None),
+                    models.ProjectReview.project_status != "done",
+                ),
             )
             .order_by(models.Site.updated_at.asc())
         )
@@ -259,13 +277,44 @@ async def svc_project_queue(
             if not restrict_to_site_ids:
                 return ProjectQueueResponse(items=[], total=0)
             stmt = stmt.where(models.Site.id.in_(restrict_to_site_ids))
-        sites = (await session.execute(stmt)).scalars().all()
+        rows = (await session.execute(stmt)).all()
+
+        site_ids = [site.id for site, _review in rows]
+        delegates: dict = {}
+        names: dict = {}
+        if site_ids:
+            delegate_rows = (await session.execute(
+                select(
+                    models.SiteDelegation.site_id,
+                    models.SiteDelegation.delegate_user_id,
+                    models.User.name,
+                    models.User.email,
+                )
+                .join(models.User, models.User.id == models.SiteDelegation.delegate_user_id)
+                .where(
+                    models.SiteDelegation.site_id.in_(site_ids),
+                    models.SiteDelegation.module == "project",
+                    models.SiteDelegation.revoked_at.is_(None),
+                )
+                .order_by(models.SiteDelegation.granted_at.desc())
+            )).all()
+            for sid, uid, uname, uemail in delegate_rows:
+                delegates.setdefault(sid, (uid, uname, uemail))
+            submitter_ids = {site.submitted_by for site, _review in rows if site.submitted_by}
+            if submitter_ids:
+                names = dict((await session.execute(
+                    select(models.User.id, models.User.name).where(models.User.id.in_(submitter_ids))
+                )).all())
+
         items: list[ProjectQueueItem] = []
-        for site in sites:
-            review = await _fetch_review_or_create(session, site=site)
-            if review.project_status == "done":
-                continue
-            items.append(await _queue_item(session, site, review))
+        for site, review in rows:
+            items.append(await _queue_item(
+                session, site, review,
+                prefetched={
+                    "delegate": delegates.get(site.id),
+                    "submitted_by_name": names.get(site.submitted_by, ""),
+                },
+            ))
         return ProjectQueueResponse(items=items, total=len(items))
 
 
@@ -598,19 +647,18 @@ async def svc_review_budget(
 async def svc_budget_admin_queue(
     session: AsyncSession, *, tenant_id: str | UUID,
 ) -> ProjectBudgetAdminQueueResponse:
-    try:
-        rows = (await session.execute(
-            select(models.Site, models.ProjectReview)
-            .join(models.ProjectReview, models.ProjectReview.site_id == models.Site.id)
-            .where(
-                models.Site.tenant_id == tenant_id,
-                models.ProjectReview.budget_status == "pending_admin",
-            )
-            .order_by(models.ProjectReview.updated_at.asc())
-        )).all()
-    except SQLAlchemyError:
-        await session.rollback()
-        return ProjectBudgetAdminQueueResponse(items=[], total=0)
+    # NOTE: no blanket `except SQLAlchemyError → empty list` here. Swallowing
+    # DB errors rendered an empty queue in the UI and masked schema↔code
+    # drift; let the dependency roll back and FastAPI surface the 500.
+    rows = (await session.execute(
+        select(models.Site, models.ProjectReview)
+        .join(models.ProjectReview, models.ProjectReview.site_id == models.Site.id)
+        .where(
+            models.Site.tenant_id == tenant_id,
+            models.ProjectReview.budget_status == "pending_admin",
+        )
+        .order_by(models.ProjectReview.updated_at.asc())
+    )).all()
     items = [await _queue_item(session, site, review) for (site, review) in rows]
     return ProjectBudgetAdminQueueResponse(items=items, total=len(items))
 
@@ -930,18 +978,17 @@ async def svc_nso_queue(
 ) -> ProjectQueueResponse:
     """Sites completed in Project and pushed to NSO — the handoff queue the
     (parallel) NSO module consumes."""
-    try:
-        rows = (await session.execute(
-            select(models.Site, models.ProjectReview)
-            .join(models.ProjectReview, models.ProjectReview.site_id == models.Site.id)
-            .where(
-                models.Site.tenant_id == tenant_id,
-                models.ProjectReview.nso_status == "pushed",
-            )
-            .order_by(models.ProjectReview.pushed_to_nso_at.desc())
-        )).all()
-    except SQLAlchemyError:
-        await session.rollback()
-        return ProjectQueueResponse(items=[], total=0)
+    # NOTE: no blanket `except SQLAlchemyError → empty list` here (see
+    # svc_budget_admin_queue) — a DB error must surface as a 500, not render
+    # as "queue is empty".
+    rows = (await session.execute(
+        select(models.Site, models.ProjectReview)
+        .join(models.ProjectReview, models.ProjectReview.site_id == models.Site.id)
+        .where(
+            models.Site.tenant_id == tenant_id,
+            models.ProjectReview.nso_status == "pushed",
+        )
+        .order_by(models.ProjectReview.pushed_to_nso_at.desc())
+    )).all()
     items = [await _queue_item(session, site, review) for (site, review) in rows]
     return ProjectQueueResponse(items=items, total=len(items))

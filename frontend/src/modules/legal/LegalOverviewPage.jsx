@@ -126,10 +126,25 @@ export default function LegalOverviewPage() {
     let cancelled = false;
     getLegalQueue()
       .then((data) => { if (!cancelled) setQueue({ status: 'ready', items: data.items, total: data.total, error: null }); })
-      .catch((err) => { if (!cancelled) setQueue({ status: 'error', items: [], total: 0, error: err?.detail || err?.message || 'Failed to load legal queue' }); });
+      .catch((err) => {
+        if (cancelled) return;
+        // Failed background refresh keeps the loaded KPIs/list + shows a banner.
+        setQueue((s) => ({
+          ...s,
+          status: s.items.length ? 'ready' : 'error',
+          error: err?.detail || err?.message || 'Failed to load legal queue',
+        }));
+      });
     listPendingChangeRequests()
       .then((data) => { if (!cancelled) setCrs({ status: 'ready', total: data.total, error: null }); })
-      .catch((err) => { if (!cancelled) setCrs({ status: 'error', total: 0, error: err?.detail || err?.message || 'Failed to load change requests' }); });
+      .catch((err) => {
+        if (cancelled) return;
+        setCrs((s) => ({
+          ...s,
+          status: s.status === 'ready' ? 'ready' : 'error',
+          error: err?.detail || err?.message || 'Failed to load change requests',
+        }));
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -213,7 +228,7 @@ export default function LegalOverviewPage() {
         right={<HeaderTag icon="legalShield" label="LEGAL_REVIEW"/>}
       />
 
-      {queue.status === 'error' && (
+      {queue.error && (
         <div className="zm-glass" style={{ padding: 18, color: 'var(--zm-danger)' }}>{queue.error}</div>
       )}
 

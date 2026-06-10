@@ -33,8 +33,16 @@ export function useSiteDataRefresh(
       return true;
     };
 
+    // Returning to a tab fires BOTH visibilitychange→visible and window
+    // focus back-to-back, which used to issue two identical refetches per
+    // page (painful on slow endpoints like /nso/queue). Coalesce bursts.
+    let lastRunAt = 0;
     const run = (detail = {}, reason = 'event') => {
-      if (shouldRun(detail, reason)) refreshRef.current?.(detail);
+      if (!shouldRun(detail, reason)) return;
+      const now = Date.now();
+      if (reason !== 'event' && now - lastRunAt < 400) return;
+      lastRunAt = now;
+      refreshRef.current?.(detail);
     };
 
     const unsubscribe = subscribeSiteDataChanged((detail) => run(detail, 'event'));

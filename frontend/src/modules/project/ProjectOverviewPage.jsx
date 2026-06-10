@@ -151,14 +151,20 @@ export default function ProjectOverviewPage() {
 
   const load = React.useCallback(() => {
     let cancelled = false;
-    setState((prev) => ({ ...prev, status: 'loading', error: null }));
+    // Keep loaded KPIs/list during background refreshes; failed refreshes
+    // keep stale data + a banner instead of zeroing the cards.
+    setState((prev) => ({ ...prev, status: prev.items.length ? prev.status : 'loading', error: null }));
     getProjectQueue()
       .then((data) => {
         if (!cancelled) setState({ status: 'ready', items: data.items, error: null });
       })
       .catch((err) => {
         if (!cancelled) {
-          setState({ status: 'error', items: [], error: err?.detail || err?.message || 'Failed to load project queue' });
+          setState((prev) => ({
+            ...prev,
+            status: prev.items.length ? 'ready' : 'error',
+            error: err?.detail || err?.message || 'Failed to load project queue',
+          }));
         }
       });
     return () => { cancelled = true; };
@@ -247,7 +253,7 @@ export default function ProjectOverviewPage() {
         right={<HeaderTag icon="route" label="DESIGN → NSO"/>}
       />
 
-      {state.status === 'error' && (
+      {state.error && (
         <div className="zm-glass" style={{ padding: 18, color: 'var(--zm-danger)' }}>
           {state.error}
         </div>

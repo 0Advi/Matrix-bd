@@ -158,7 +158,12 @@ export default function DesignOverviewPage() {
       })
       .catch((err) => {
         if (cancelled) return;
-        setState({ status: 'error', items: [], total: 0, error: err?.detail || err?.message || 'Failed to load design queue' });
+        // Failed background refresh keeps the loaded KPIs/list + shows a banner.
+        setState((s) => ({
+          ...s,
+          status: s.items.length ? 'ready' : 'error',
+          error: err?.detail || err?.message || 'Failed to load design queue',
+        }));
       });
     return () => { cancelled = true; };
   }, []);
@@ -205,7 +210,7 @@ export default function DesignOverviewPage() {
         </div>
       )}
 
-      {state.status === 'error' && (
+      {state.error && (
         <div className="zm-glass" style={{ padding: 18, color: 'var(--zm-danger)' }}>
           {state.error}
         </div>

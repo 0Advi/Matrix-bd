@@ -529,19 +529,32 @@ async def _list_with_status(
 
     rows = (await session.execute(stmt)).scalars().all()
 
+    # Batch the per-request lookups: 2 queries total instead of up to 3 per
+    # change request (N+1 round trips through pgBouncer/NullPool).
+    sites_by_id: dict = {}
+    names: dict = {}
+    if rows:
+        site_ids = {cr.site_id for cr in rows if cr.site_id}
+        if site_ids:
+            sites_by_id = {s.id: s for s in (await session.execute(
+                select(models.Site).where(models.Site.id.in_(site_ids))
+            )).scalars()}
+        user_ids = {cr.requested_by for cr in rows if cr.requested_by}
+        user_ids |= {cr.reviewed_by for cr in rows if cr.reviewed_by}
+        if user_ids:
+            names = dict((await session.execute(
+                select(models.User.id, models.User.name).where(models.User.id.in_(user_ids))
+            )).all())
+
     items: list[ChangeRequestResponse] = []
     for cr in rows:
-        site = (await session.execute(
-            select(models.Site).where(models.Site.id == cr.site_id)
-        )).scalar_one_or_none()
-        requested_by_name = await fetch_user_name(session, cr.requested_by)
-        reviewed_by_name  = await fetch_user_name(session, cr.reviewed_by)
+        site = sites_by_id.get(cr.site_id)
         items.append(_to_response(
             cr,
             site_code=site.code if site else "",
             site_name=site.name if site else "",
-            requested_by_name=requested_by_name,
-            reviewed_by_name=reviewed_by_name,
+            requested_by_name=names.get(cr.requested_by),
+            reviewed_by_name=names.get(cr.reviewed_by),
         ))
 
     return ChangeRequestListResponse(items=items, total=len(items))

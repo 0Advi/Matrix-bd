@@ -88,7 +88,9 @@ export default function LegalQueuePage() {
 
   const load = React.useCallback(() => {
     let cancelled = false;
-    setState({ status: 'loading', items: [], total: 0, error: null });
+    // Keep previously loaded rows visible during background refreshes —
+    // wiping them blanked the table on every tab refocus.
+    setState((s) => ({ ...s, status: s.items.length ? s.status : 'loading', error: null }));
     getLegalQueue()
       .then((data) => {
         if (cancelled) return;
@@ -96,7 +98,13 @@ export default function LegalQueuePage() {
       })
       .catch((err) => {
         if (cancelled) return;
-        setState({ status: 'error', items: [], total: 0, error: err?.detail || err?.message || 'Failed to load legal queue' });
+        // A failed background refresh must not destroy good data — keep the
+        // stale rows and surface the error as a banner.
+        setState((s) => ({
+          ...s,
+          status: s.items.length ? 'ready' : 'error',
+          error: err?.detail || err?.message || 'Failed to load legal queue',
+        }));
       });
     return () => { cancelled = true; };
   }, []);
@@ -106,17 +114,26 @@ export default function LegalQueuePage() {
 
   // Supervisor view: best-effort hydration of delegate names per visible row.
   // Failures degrade silently — the row just won't show a delegated badge.
+  // Keyed on a stable id signature (state.items is a new array identity on
+  // every refresh) and skips already-hydrated ids, so a tab refocus doesn't
+  // re-issue N delegation requests for unchanged rows.
+  const itemIdKey = state.items.map((r) => r.siteId).join('|');
+  const delegateNamesRef = React.useRef(delegateNames);
+  delegateNamesRef.current = delegateNames;
   React.useEffect(() => {
-    if (!isSupervisor || state.status !== 'ready' || state.items.length === 0) return;
+    if (!isSupervisor || !itemIdKey) return;
+    const pendingIds = itemIdKey.split('|').filter((id) => !(id in delegateNamesRef.current));
+    if (pendingIds.length === 0) return;
     let cancelled = false;
     (async () => {
       const updates = {};
-      await Promise.all(state.items.map(async (row) => {
+      await Promise.all(pendingIds.map(async (siteId) => {
         try {
-          const r = await listLegalDelegationsForSite(row.siteId);
-          if (r.items?.length) {
-            updates[row.siteId] = r.items[0].delegateName || r.items[0].delegateEmail;
-          }
+          const r = await listLegalDelegationsForSite(siteId);
+          // Cache negative results too (null) so unchanged rows are never re-queried.
+          updates[siteId] = r.items?.length
+            ? (r.items[0].delegateName || r.items[0].delegateEmail)
+            : null;
         } catch { /* silent */ }
       }));
       if (!cancelled && Object.keys(updates).length) {
@@ -124,7 +141,7 @@ export default function LegalQueuePage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [isSupervisor, state.status, state.items]);
+  }, [isSupervisor, itemIdKey]);
 
   const open = (row) => {
     const agreementStatus = normalizeAgreementStatus(row.agreementStatus);
@@ -168,7 +185,9 @@ export default function LegalQueuePage() {
         </div>
       )}
 
-      {state.status === 'error' && (
+      {/* Error banner — also shown above stale rows when a background
+          refresh fails (status stays 'ready' so the table survives). */}
+      {state.error && (
         <div className="zm-glass" style={{ padding: 18, color: 'var(--zm-danger)' }}>
           {state.error}
         </div>

@@ -89,7 +89,9 @@ export default function DesignQueuePage() {
 
   const load = React.useCallback(() => {
     let cancelled = false;
-    setState({ status: 'loading', items: [], total: 0, error: null });
+    // Keep loaded rows visible during background refreshes (no table wipe on
+    // tab refocus); a failed refresh keeps stale data + shows a banner.
+    setState((s) => ({ ...s, status: s.items.length ? s.status : 'loading', error: null }));
     getDesignQueue()
       .then((data) => {
         if (cancelled) return;
@@ -97,7 +99,11 @@ export default function DesignQueuePage() {
       })
       .catch((err) => {
         if (cancelled) return;
-        setState({ status: 'error', items: [], total: 0, error: err?.detail || err?.message || 'Failed to load design queue' });
+        setState((s) => ({
+          ...s,
+          status: s.items.length ? 'ready' : 'error',
+          error: err?.detail || err?.message || 'Failed to load design queue',
+        }));
       });
     return () => { cancelled = true; };
   }, []);
@@ -128,7 +134,7 @@ export default function DesignQueuePage() {
         </div>
       )}
 
-      {state.status === 'error' && (
+      {state.error && (
         <div className="zm-glass" style={{ padding: 18, color: 'var(--zm-danger)' }}>
           {state.error}
         </div>

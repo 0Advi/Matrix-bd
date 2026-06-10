@@ -32,16 +32,24 @@ export default function ChangeRequestsPage() {
   const [busy, setBusy] = React.useState(null);
 
   const load = React.useCallback(() => {
-    setState((s) => ({ ...s, status: 'loading', error: null }));
+    let cancelled = false;
+    // Keep loaded rows visible during approve/reject reloads; failed
+    // refreshes keep stale data + a banner instead of blanking the list.
+    setState((s) => ({ ...s, status: s.items.length ? s.status : 'loading', error: null }));
     listPendingChangeRequests()
-      .then((data) => setState({ status: 'ready', items: data.items, total: data.total, error: null }))
-      .catch((err) => setState({
-        status: 'error', items: [], total: 0,
-        error: err?.detail || err?.message || 'Failed to load',
-      }));
+      .then((data) => { if (!cancelled) setState({ status: 'ready', items: data.items, total: data.total, error: null }); })
+      .catch((err) => {
+        if (cancelled) return;
+        setState((s) => ({
+          ...s,
+          status: s.items.length ? 'ready' : 'error',
+          error: err?.detail || err?.message || 'Failed to load',
+        }));
+      });
+    return () => { cancelled = true; };
   }, []);
 
-  React.useEffect(() => { load(); }, [load]);
+  React.useEffect(() => load(), [load]);
 
   const approve = async (cr) => {
     if (!window.confirm(
@@ -82,7 +90,7 @@ export default function ChangeRequestsPage() {
       {state.status === 'loading' && (
         <div className="zm-glass" style={{ padding: 24, textAlign: 'center', color: 'var(--zm-fg-3)' }}>Loading…</div>
       )}
-      {state.status === 'error' && (
+      {state.error && (
         <div className="zm-glass" style={{ padding: 18, color: 'var(--zm-danger)' }}>{state.error}</div>
       )}
       {state.status === 'ready' && state.items.length === 0 && (

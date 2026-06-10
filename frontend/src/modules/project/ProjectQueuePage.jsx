@@ -80,14 +80,20 @@ export default function ProjectQueuePage({ mode = 'pipeline' }) {
 
   const load = React.useCallback(() => {
     let cancelled = false;
-    setState((prev) => ({ ...prev, status: 'loading', error: null }));
+    // Keep loaded rows on screen during refreshes; failed refreshes keep
+    // stale data + a banner instead of blanking the table.
+    setState((prev) => ({ ...prev, status: prev.items.length ? prev.status : 'loading', error: null }));
     getProjectQueue()
       .then((data) => {
         if (!cancelled) setState({ status: 'ready', items: data.items, total: data.total, error: null });
       })
       .catch((err) => {
         if (!cancelled) {
-          setState({ status: 'error', items: [], total: 0, error: err?.detail || err?.message || 'Failed to load project queue' });
+          setState((prev) => ({
+            ...prev,
+            status: prev.items.length ? 'ready' : 'error',
+            error: err?.detail || err?.message || 'Failed to load project queue',
+          }));
         }
       });
     return () => { cancelled = true; };
@@ -126,7 +132,7 @@ export default function ProjectQueuePage({ mode = 'pipeline' }) {
         </div>
       )}
 
-      {state.status === 'error' && (
+      {state.error && (
         <div className="zm-glass" style={{ padding: 18, color: 'var(--zm-danger)' }}>
           {state.error}
         </div>

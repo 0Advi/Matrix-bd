@@ -123,6 +123,24 @@ def _compute_stage(row: models.NsoReview, project: Optional[models.ProjectReview
     return "final"
 
 
+def _display_rollups(
+    row: models.NsoReview, project: Optional[models.ProjectReview],
+) -> tuple[str, str]:
+    """Display-time (nso_status, current_stage) WITHOUT mutating the row.
+
+    Read paths (queue / history / detail GET) must never write — `_sync_rollups`
+    on a GET turned every queue load into N potential UPDATEs (and the
+    row-creation variant into N INSERTs), which is what made /nso/queue take
+    seconds. Rollup persistence belongs to the stage-save write paths only.
+    """
+    current_stage = _compute_stage(row, project)
+    if row.nso_status == "complete":
+        nso_status = "complete"
+    else:
+        nso_status = "in_progress" if current_stage != "stage_one" or _stage_one_complete(row) else "pending"
+    return nso_status, current_stage
+
+
 def _sync_rollups(row: models.NsoReview, project: Optional[models.ProjectReview]) -> None:
     now = datetime.now(timezone.utc)
     if _stage_one_complete(row) and row.stage_one_completed_at is None:
@@ -182,12 +200,10 @@ async def _queue_item(
     nso_status = row.nso_status if row else "pending"
     current_stage = row.current_stage if row else "stage_one"
     if row is not None:
-        _sync_rollups(row, project)
-        nso_status = row.nso_status
-        current_stage = row.current_stage
+        nso_status, current_stage = _display_rollups(row, project)
     next_action = "Open Stage 1"
     if row is not None:
-        if row.nso_status == "complete":
+        if nso_status == "complete":
             next_action = "Complete"
         elif current_stage == "stage_two":
             next_action = "Open license checks"
@@ -217,7 +233,7 @@ async def _state_response(
     row: models.NsoReview,
     project: Optional[models.ProjectReview],
 ) -> NsoStateResponse:
-    _sync_rollups(row, project)
+    nso_status, current_stage = _display_rollups(row, project)
     return NsoStateResponse(
         site_id=str(site.id),
         site_code=site.ca_code or site.code or "",
@@ -234,8 +250,8 @@ async def _state_response(
         project_initialization_status=(project.initialization_status if project else "pending"),
         project_final_completion_date=(project.final_completion_date if project else None),
         project_completed_at=(project.project_completed_at if project else None),
-        nso_status=row.nso_status,
-        current_stage=row.current_stage,
+        nso_status=nso_status,
+        current_stage=current_stage,
         triggers=_triggers(site, row, project),
         property_details=row.property_details,
         communication_floated=row.communication_floated,
@@ -270,11 +286,25 @@ async def svc_nso_queue(session: AsyncSession, *, tenant_id: str | UUID) -> NsoQ
             )
             .order_by(models.Site.updated_at.asc())
         )).scalars().all()
+        # Batch the child lookups (2 queries regardless of N) and never create
+        # rows on a GET — `_queue_item` handles row=None, and the write paths
+        # (`svc_save_stage_*`) create the NsoReview when work actually starts.
+        # The old per-site SELECT+SELECT (+INSERT flush on first hydration)
+        # made this endpoint take seconds through the pgBouncer/NullPool path
+        # and let two concurrent GETs race on the site_id primary key.
+        site_ids = [site.id for site in sites]
+        nso_rows: dict = {}
+        projects: dict = {}
+        if site_ids:
+            nso_rows = {r.site_id: r for r in (await session.execute(
+                select(models.NsoReview).where(models.NsoReview.site_id.in_(site_ids))
+            )).scalars()}
+            projects = {p.site_id: p for p in (await session.execute(
+                select(models.ProjectReview).where(models.ProjectReview.site_id.in_(site_ids))
+            )).scalars()}
         items: list[NsoQueueItem] = []
         for site in sites:
-            row = await _fetch_nso_or_create(session, site=site)
-            project = await _fetch_project(session, site_id=site.id)
-            items.append(await _queue_item(session, site, row, project))
+            items.append(await _queue_item(session, site, nso_rows.get(site.id), projects.get(site.id)))
         return NsoQueueResponse(items=items, total=len(items))
 
 

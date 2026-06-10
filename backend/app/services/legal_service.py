@@ -184,26 +184,29 @@ async def _executive_has_legal_delegation(
     Returns False (rather than raising) if the site_delegations table doesn't
     exist yet — keeps this slice independent of the U2 delegation slice.
     """
+    # SAVEPOINT so a missing-table probe failure rolls back ONLY this probe —
+    # the old `session.rollback()` nuked the caller's whole transaction, and
+    # the bare `except Exception` (no rollback) left the connection in a
+    # failed-transaction state for the rest of the request. Mirrors
+    # _find_legal_delegate below.
     try:
-        result = await session.execute(
-            text(
-                """
-                SELECT 1
-                  FROM site_delegations
-                 WHERE site_id = :site_id
-                   AND module = 'legal'
-                   AND delegate_user_id = :user_id
-                   AND revoked_at IS NULL
-                 LIMIT 1
-                """
-            ),
-            {"site_id": str(site_id), "user_id": str(user_id)},
-        )
-        return result.first() is not None
+        async with session.begin_nested():
+            result = await session.execute(
+                text(
+                    """
+                    SELECT 1
+                      FROM site_delegations
+                     WHERE site_id = :site_id
+                       AND module = 'legal'
+                       AND delegate_user_id = :user_id
+                       AND revoked_at IS NULL
+                     LIMIT 1
+                    """
+                ),
+                {"site_id": str(site_id), "user_id": str(user_id)},
+            )
+            return result.first() is not None
     except ProgrammingError:
-        await session.rollback()
-        return False
-    except Exception:
         return False
 
 
@@ -319,10 +322,25 @@ async def svc_legal_queue(
 
     sites = (await session.execute(stmt)).scalars().all()
 
+    # Batch the per-site lookups: 2 queries total instead of 2 per site
+    # (N+1 costs a full round trip each through pgBouncer/NullPool).
+    site_ids = [site.id for site in sites]
+    dd_by_site: dict = {}
+    names: dict = {}
+    if site_ids:
+        dd_by_site = {d.site_id: d for d in (await session.execute(
+            select(models.LegalDdChecklist).where(models.LegalDdChecklist.site_id.in_(site_ids))
+        )).scalars()}
+        submitter_ids = {site.submitted_by for site in sites if site.submitted_by}
+        if submitter_ids:
+            names = dict((await session.execute(
+                select(models.User.id, models.User.name).where(models.User.id.in_(submitter_ids))
+            )).all())
+
     items: list[LegalQueueItem] = []
     for site in sites:
-        dd = await _fetch_dd_or_none(session, site_id=site.id)
-        submitted_by_name = await fetch_user_name(session, site.submitted_by)
+        dd = dd_by_site.get(site.id)
+        submitted_by_name = names.get(site.submitted_by, "")
         items.append(LegalQueueItem(
             site_id=str(site.id),
             site_code=site.code or "",

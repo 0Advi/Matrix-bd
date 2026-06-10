@@ -248,11 +248,44 @@ async def svc_design_queue(
 
     sites = (await session.execute(stmt)).scalars().all()
 
+    # Batch the per-site lookups: 3 queries total instead of 3 per site
+    # (each N+1 round trip costs real latency through pgBouncer/NullPool).
+    site_ids = [site.id for site in sites]
+    reviews: dict = {}
+    delegates: dict = {}
+    names: dict = {}
+    if site_ids:
+        reviews = {r.site_id: r for r in (await session.execute(
+            select(models.DesignReview).where(models.DesignReview.site_id.in_(site_ids))
+        )).scalars()}
+        delegate_rows = (await session.execute(
+            select(
+                models.SiteDelegation.site_id,
+                models.SiteDelegation.delegate_user_id,
+                models.User.name,
+                models.User.email,
+            )
+            .join(models.User, models.User.id == models.SiteDelegation.delegate_user_id)
+            .where(
+                models.SiteDelegation.site_id.in_(site_ids),
+                models.SiteDelegation.module == "design",
+                models.SiteDelegation.revoked_at.is_(None),
+            )
+            .order_by(models.SiteDelegation.granted_at.desc())
+        )).all()
+        for sid, uid, uname, uemail in delegate_rows:
+            delegates.setdefault(sid, (uid, uname, uemail))
+        submitter_ids = {site.submitted_by for site in sites if site.submitted_by}
+        if submitter_ids:
+            names = dict((await session.execute(
+                select(models.User.id, models.User.name).where(models.User.id.in_(submitter_ids))
+            )).all())
+
     items: list[DesignQueueItem] = []
     for site in sites:
-        review = await _fetch_review_or_none(session, site_id=site.id)
-        delegate = await _active_design_delegate(session, site_id=site.id)
-        submitted_by_name = await fetch_user_name(session, site.submitted_by)
+        review = reviews.get(site.id)
+        delegate = delegates.get(site.id)
+        submitted_by_name = names.get(site.submitted_by, "")
         items.append(DesignQueueItem(
             site_id=str(site.id),
             site_code=site.code or "",
@@ -461,21 +494,21 @@ async def svc_list_design_delegations_for_site(
     session: AsyncSession, *, tenant_id: str | UUID, site_id: str | UUID,
 ) -> dict:
     """Active design allocations for a single site (supervisor view)."""
-    try:
-        stmt = (
-            select(models.SiteDelegation, models.User.email, models.User.name)
-            .join(models.User, models.User.id == models.SiteDelegation.delegate_user_id)
-            .where(
-                models.SiteDelegation.site_id == site_id,
-                models.SiteDelegation.tenant_id == tenant_id,
-                models.SiteDelegation.module == "design",
-                models.SiteDelegation.revoked_at.is_(None),
-            )
-            .order_by(models.SiteDelegation.granted_at.desc())
+    # NOTE: no `except Exception → empty list` here. The old swallow had no
+    # rollback (leaving the session in a failed-transaction state) and made DB
+    # errors indistinguishable from "no delegations" in the UI.
+    stmt = (
+        select(models.SiteDelegation, models.User.email, models.User.name)
+        .join(models.User, models.User.id == models.SiteDelegation.delegate_user_id)
+        .where(
+            models.SiteDelegation.site_id == site_id,
+            models.SiteDelegation.tenant_id == tenant_id,
+            models.SiteDelegation.module == "design",
+            models.SiteDelegation.revoked_at.is_(None),
         )
-        rows = (await session.execute(stmt)).all()
-    except Exception:
-        return {"items": [], "total": 0}
+        .order_by(models.SiteDelegation.granted_at.desc())
+    )
+    rows = (await session.execute(stmt)).all()
     return {
         "items": [
             {
