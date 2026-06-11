@@ -113,8 +113,20 @@ export default function TeamDashboard({ onLogout, fetchers = REAL_FETCHERS, work
     };
     for (const s of deliverables.items || []) ensure(s).design.deliverables = s.deliverables || [];
     for (const s of gfc.items || []) { const e = ensure(s); e.design.gfcPending = true; e.design.boqAmount = s.boqEstimatedAmount ?? null; }
-    for (const s of finance.items || []) ensure(s).payment = { caCode: s.caCode, financeAmount: s.financeAmount };
-    for (const s of budget.items || []) ensure(s).project = { budgetTotal: s.budgetTotal };
+  for (const s of finance.items || []) ensure(s).payment = {
+    caCode: s.caCode,
+    kycVerified: s.kycVerified,
+    financeAmount: s.financeAmount,
+    submittedByName: s.submittedByName,
+  };
+  for (const s of budget.items || []) ensure(s).project = {
+    budgetStatus: s.budgetStatus,
+    budgetTotal: s.budgetTotal,
+    totalIndoorAreaSqft: s.totalIndoorAreaSqft,
+    totalAreaSqft: s.totalAreaSqft,
+    covers: s.covers,
+    submittedByName: s.submittedByName,
+  };
     return [...map.values()];
   }, [deliverables.items, gfc.items, finance.items, budget.items]);
 

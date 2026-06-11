@@ -64,6 +64,119 @@ function inputStyle(disabled = false) {
   };
 }
 
+function snapshotValue(value, suffix = '') {
+  if (value == null || value === '') return '—';
+  return `${value}${suffix}`;
+}
+
+function money(value) {
+  if (value == null || value === '') return '—';
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '—';
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(num);
+}
+
+function percent(value) {
+  if (value == null || value === '') return '—';
+  return `${value}%`;
+}
+
+function SnapshotItem({ label, value, mono = false, wide = false }) {
+  return (
+    <div style={{
+      minWidth: 0,
+      gridColumn: wide ? 'span 2' : 'auto',
+      padding: '10px 12px',
+      borderRadius: 9,
+      border: '1px solid var(--zm-line)',
+      background: 'var(--zm-surface-2)',
+    }}>
+      <div style={{
+        color: 'var(--zm-fg-3)',
+        fontSize: 10,
+        fontWeight: 850,
+        letterSpacing: '0.1em',
+        textTransform: 'uppercase',
+        marginBottom: 5,
+      }}>{label}</div>
+      <div style={{
+        color: 'var(--zm-fg)',
+        fontSize: 13,
+        fontWeight: 760,
+        lineHeight: 1.35,
+        fontFamily: mono ? 'var(--zm-font-mono)' : 'var(--zm-font-body)',
+        overflowWrap: 'anywhere',
+      }}>{value}</div>
+    </div>
+  );
+}
+
+function PropertySnapshotPanel({ snapshot = {} }) {
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        gap: 10,
+      }}>
+        <SnapshotItem label="Site" value={snapshotValue(snapshot.siteName)} />
+        <SnapshotItem label="City" value={snapshotValue(snapshot.city)} />
+        <SnapshotItem label="Visit date" value={snapshotValue(snapshot.visitDate)} mono />
+        <SnapshotItem label="Model" value={snapshotValue(snapshot.model)} />
+        <SnapshotItem label="CA code" value={snapshotValue(snapshot.caCode)} mono />
+        <SnapshotItem label="Finance amount" value={money(snapshot.financeAmount)} mono />
+        <SnapshotItem label="KYC" value={snapshot.kycVerified ? 'Verified' : 'Pending'} />
+        <SnapshotItem label="Rent type" value={snapshot.rentType ? pretty(snapshot.rentType) : '—'} />
+        <SnapshotItem label="Rent / MG" value={money(snapshot.expectedRent)} mono />
+        <SnapshotItem label="Revenue share" value={percent(snapshot.expectedRevsharePct)} mono />
+        <SnapshotItem
+          label="Escalation"
+          value={
+            snapshot.expectedEscalationPct != null
+              ? `${snapshot.expectedEscalationPct}% every ${snapshot.expectedEscalationYears || 1} yr`
+              : '—'
+          }
+          mono
+        />
+        <SnapshotItem label="Score" value={snapshotValue(snapshot.score)} mono />
+        <SnapshotItem label="Est. sales" value={money(snapshot.estimatedMonthlySales)} mono />
+        <SnapshotItem label="Carpet area" value={snapshotValue(snapshot.carpetAreaSqft, ' sqft')} mono />
+        <SnapshotItem label="CAM" value={money(snapshot.camCharges)} mono />
+        <SnapshotItem label="Deposit" value={money(snapshot.securityDeposit)} mono />
+        <SnapshotItem label="Brokerage" value={money(snapshot.brokerage)} mono />
+        <SnapshotItem label="Lock-in" value={snapshotValue(snapshot.lockInMonths, ' months')} mono />
+        <SnapshotItem label="Tenure" value={snapshotValue(snapshot.tenureMonths, ' months')} mono />
+        <SnapshotItem label="Rent-free" value={snapshotValue(snapshot.rentFreeDays, ' days')} mono />
+        <SnapshotItem label="Nearest Starbucks" value={snapshotValue(snapshot.nearestStarbucksM, ' m')} mono />
+        <SnapshotItem label="Nearest TWC" value={snapshotValue(snapshot.nearestTwcM, ' m')} mono />
+        <SnapshotItem label="Google pin" value={snapshotValue(snapshot.googleMapsPin)} mono wide />
+        {snapshot.googleMapsUrl && (
+          <SnapshotItem
+            label="Maps link"
+            value={<a href={snapshot.googleMapsUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--zm-accent)' }}>Open Google Maps</a>}
+            wide
+          />
+        )}
+      </div>
+      <div style={{
+        padding: '10px 12px',
+        borderRadius: 10,
+        border: '1px solid var(--zm-line)',
+        background: 'rgba(10, 91, 74, 0.06)',
+        color: 'var(--zm-fg-2)',
+        fontSize: 12.5,
+        lineHeight: 1.45,
+      }}>
+        Property details are inherited from BD, Add Details, and Finance / CA. NSO can review this snapshot but should not overwrite upstream property data.
+      </div>
+    </div>
+  );
+}
+
 function StatusChip({ value, tone = 'var(--zm-accent)' }) {
   return (
     <span style={{
@@ -238,7 +351,7 @@ export default function NsoReviewPage() {
   const { siteId } = useParams();
   const navigate = useNavigate();
   const [state, setState] = React.useState({ status: 'loading', review: null, error: null });
-  const [stageOne, setStageOne] = React.useState({ propertyDetails: '', communicationFloated: null });
+  const [stageOne, setStageOne] = React.useState({ communicationFloated: null });
   const [stageTwo, setStageTwo] = React.useState({
     fssaiStatus: 'pending',
     healthTradeStatus: 'pending',
@@ -261,7 +374,6 @@ export default function NsoReviewPage() {
 
   const hydrate = React.useCallback((review) => {
     setStageOne({
-      propertyDetails: review.propertyDetails || '',
       communicationFloated: review.communicationFloated ?? null,
     });
     setStageTwo({
@@ -451,7 +563,7 @@ export default function NsoReviewPage() {
             footer={saveButton(
               'Save Stage 1',
               saveOne,
-              !stageOneUnlocked || !stageOne.propertyDetails.trim() || stageOne.communicationFloated == null,
+              !stageOneUnlocked || stageOne.communicationFloated == null,
               'stage-one',
             )}
           >
@@ -465,16 +577,7 @@ export default function NsoReviewPage() {
                 </div>
                 <div>
                   <FieldLabel>Property details</FieldLabel>
-                  <textarea
-                    value={stageOne.propertyDetails}
-                    onChange={(e) => {
-                      setDirty(true);
-                      setStageOne((prev) => ({ ...prev, propertyDetails: e.target.value }));
-                    }}
-                    rows={4}
-                    style={{ ...inputStyle(false), resize: 'vertical', lineHeight: 1.45 }}
-                    placeholder="Capture property readiness notes, setup dependencies, and site-specific context."
-                  />
+                  <PropertySnapshotPanel snapshot={review.propertySnapshot} />
                 </div>
                 <div>
                   <FieldLabel>Communication floated</FieldLabel>

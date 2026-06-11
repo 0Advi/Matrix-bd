@@ -57,6 +57,37 @@ function queueItemFromServer(row) {
   };
 }
 
+function propertySnapshotFromServer(row = {}) {
+  return {
+    siteName: row.site_name,
+    siteCode: row.site_code,
+    city: row.city,
+    visitDate: row.visit_date,
+    model: row.model,
+    googleMapsPin: row.google_maps_pin,
+    googleMapsUrl: row.google_maps_url,
+    caCode: row.ca_code,
+    financeAmount: row.finance_amount,
+    kycVerified: Boolean(row.kyc_verified),
+    rentType: row.rent_type,
+    expectedRent: row.expected_rent,
+    expectedRevsharePct: row.expected_revshare_pct,
+    expectedEscalationPct: row.expected_escalation_pct,
+    expectedEscalationYears: row.expected_escalation_years,
+    score: row.score,
+    estimatedMonthlySales: row.estimated_monthly_sales,
+    carpetAreaSqft: row.carpet_area_sqft,
+    camCharges: row.cam_charges,
+    securityDeposit: row.security_deposit,
+    brokerage: row.brokerage,
+    lockInMonths: row.lock_in_months,
+    tenureMonths: row.tenure_months,
+    rentFreeDays: row.rent_free_days,
+    nearestStarbucksM: row.nearest_starbucks_m,
+    nearestTwcM: row.nearest_twc_m,
+  };
+}
+
 function stateFromServer(row) {
   if (!row) return row;
   return {
@@ -78,6 +109,7 @@ function stateFromServer(row) {
     nsoStatus: row.nso_status,
     currentStage: row.current_stage,
     triggers: (row.triggers || []).map(triggerFromServer),
+    propertySnapshot: propertySnapshotFromServer(row.property_snapshot || {}),
     propertyDetails: row.property_details,
     communicationFloated: row.communication_floated,
     fssaiStatus: row.fssai_status,
@@ -121,10 +153,9 @@ export async function getNsoHistoryDetail(siteId) {
 }
 
 export async function saveNsoStageOne(siteId, { propertyDetails, communicationFloated }) {
-  const data = await client.post(`/nso/${siteId}/stage-one`, {
-    property_details: propertyDetails,
-    communication_floated: communicationFloated,
-  }).then((r) => r.data);
+  const body = { communication_floated: communicationFloated };
+  if (propertyDetails) body.property_details = propertyDetails;
+  const data = await client.post(`/nso/${siteId}/stage-one`, body).then((r) => r.data);
   notifySiteDataChanged({ source: 'nso', action: 'stage_one_save', siteId });
   return stateFromServer(data);
 }

@@ -144,9 +144,11 @@ function PaymentBlock({ site, onApprove, onReject }) {
   return (
     <>
       <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 12, fontSize: 12.5 }}>
+        <RequestMeta label="Submitted by" value={site.payment.submittedByName || site.createdByName} />
+        <RequestMeta label="KYC status" value={site.payment.kycVerified ? 'Verified' : 'Pending'} />
         <div><div style={{ color: T.textFaint, fontSize: 11 }}>CA code</div>
           <div style={{ fontFamily: T.mono, color: T.text }}>{site.payment.caCode || '—'}</div></div>
-        <div><div style={{ color: T.textFaint, fontSize: 11 }}>Token amount</div>
+        <div><div style={{ color: T.textFaint, fontSize: 11 }}>Finance amount</div>
           <div style={{ fontFamily: T.mono, color: T.successText, ...TABULAR }}>{inr(site.payment.financeAmount)}</div></div>
       </div>
       <div style={{ fontSize: 11.5, color: T.textFaint, marginBottom: 10 }}>Supervisor-approved — awaiting your final sign-off.</div>
@@ -166,6 +168,17 @@ function PaymentBlock({ site, onApprove, onReject }) {
 // Indices (1-based) whose sum feeds the "Civil, Interior & MEP" metric — must
 // match the same constant on the executive form (ProjectReviewPage).
 const CIVIL_MEP_IDX = [2, 3, 4, 5, 8];
+
+const present = (value, fallback = '—') => (value == null || value === '' ? fallback : value);
+
+function RequestMeta({ label, value }) {
+  return (
+    <div>
+      <div style={{ color: T.textFaint, fontSize: 11 }}>{label}</div>
+      <div style={{ color: T.text, fontSize: 12.5, fontWeight: 650 }}>{present(value)}</div>
+    </div>
+  );
+}
 
 function metricRow(label, value) {
   return (
@@ -187,6 +200,7 @@ function plusDaysISO(n) {
 
 function BudgetBlock({ site, fetchDetail, onDecide }) {
   const [detail, setDetail] = React.useState(null);
+  const [detailError, setDetailError] = React.useState(null);
   const [comments, setComments] = React.useState('');
   // The admin sets the project initialization date as part of approving the
   // budget; defaults to 2 days out, overridable via the calendar.
@@ -194,13 +208,44 @@ function BudgetBlock({ site, fetchDetail, onDecide }) {
   const [busy, setBusy] = React.useState(false);
   const acTheme = (typeof document !== 'undefined'
     && document.querySelector('.ac-root[data-theme]')?.getAttribute('data-theme')) || 'dark';
-  React.useEffect(() => {
+  const request = site.project || {};
+  const fallback = React.useMemo(() => ({
+    items: [],
+    budgetStatus: request.budgetStatus,
+    budgetTotal: request.budgetTotal,
+    totalIndoorAreaSqft: request.totalIndoorAreaSqft,
+    totalAreaSqft: request.totalAreaSqft,
+    covers: request.covers,
+    submittedByName: request.submittedByName || site.createdByName,
+  }), [
+    request.budgetStatus,
+    request.budgetTotal,
+    request.totalIndoorAreaSqft,
+    request.totalAreaSqft,
+    request.covers,
+    request.submittedByName,
+    site.createdByName,
+  ]);
+  const loadDetail = React.useCallback(() => {
     let live = true;
-    const fallback = { items: [], budgetTotal: site.budgetTotal };
-    if (!fetchDetail) { setDetail(fallback); return; }
-    fetchDetail(site.siteId).then((d) => { if (live) setDetail(d); }).catch(() => { if (live) setDetail(fallback); });
+    setDetailError(null);
+    if (!fetchDetail) {
+      setDetail(fallback);
+      return () => { live = false; };
+    }
+    fetchDetail(site.siteId)
+      .then((d) => {
+        if (!live) return;
+        setDetail({ ...fallback, ...d });
+      })
+      .catch((err) => {
+        if (!live) return;
+        setDetail(fallback);
+        setDetailError(err?.detail || err?.message || 'Could not load full project budget details.');
+      });
     return () => { live = false; };
-  }, [site.siteId, site.budgetTotal, fetchDetail]);
+  }, [fallback, fetchDetail, site.siteId]);
+  React.useEffect(() => loadDetail(), [loadDetail]);
   const decide = async (decision) => {
     if (decision === 'reject' && !comments.trim()) { window.alert('Comments are required to send back.'); return; }
     if (decision === 'approve' && !initDate) { window.alert('Set the project initialization date to approve.'); return; }
@@ -225,6 +270,30 @@ function BudgetBlock({ site, fetchDetail, onDecide }) {
   const dim = (v, suffix = '') => (v != null ? `${v}${suffix}` : '—');
   return (
     <>
+      {detailError && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          marginBottom: 12,
+          padding: '10px 12px',
+          borderRadius: T.radiusSm,
+          border: `1px solid ${T.dangerText}`,
+          color: T.dangerText,
+          background: T.dangerSoft,
+          fontSize: 12.5,
+        }}>
+          <Icon.alert size={14} style={{ flexShrink: 0 }} />
+          <span style={{ flex: 1 }}>Full budget detail could not load: {detailError}</span>
+          <Button size="sm" onClick={loadDetail}>Retry</Button>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 12 }}>
+        <RequestMeta label="Submitted by" value={detail.submittedByName} />
+        <RequestMeta label="Budget status" value={detail.budgetStatus} />
+      </div>
+
       {items.length > 0 && (
         <div style={{ display: 'grid', gap: 6, marginBottom: 12 }}>
           {items.map((it) => (
@@ -238,6 +307,19 @@ function BudgetBlock({ site, fetchDetail, onDecide }) {
             <span style={{ flex: 1, color: T.text, fontWeight: 700 }}>Total investment</span>
             <span style={{ fontFamily: T.mono, color: T.successText, fontWeight: 700, ...TABULAR }}>{inr(total)}</span>
           </div>
+        </div>
+      )}
+
+      {items.length === 0 && (
+        <div style={{
+          marginBottom: 12,
+          padding: '10px 12px',
+          borderRadius: T.radiusSm,
+          border: `1px dashed ${T.lineStrong}`,
+          color: T.textMuted,
+          fontSize: 12.5,
+        }}>
+          Budget line items were not returned for this request.
         </div>
       )}
 

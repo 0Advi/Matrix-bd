@@ -20,6 +20,7 @@ from app.domain.schemas.nso import (
     NsoHistoryResponse,
     NsoQueueItem,
     NsoQueueResponse,
+    NsoPropertySnapshot,
     NsoStageOneRequest,
     NsoStageThreeRequest,
     NsoStageTwoRequest,
@@ -45,6 +46,70 @@ async def _fetch_project(
     return (await session.execute(
         select(models.ProjectReview).where(models.ProjectReview.site_id == site_id)
     )).scalar_one_or_none()
+
+
+async def _fetch_site_detail(
+    session: AsyncSession, *, site_id: str | UUID,
+) -> Optional[models.SiteDetail]:
+    return (await session.execute(
+        select(models.SiteDetail).where(models.SiteDetail.site_id == site_id)
+    )).scalar_one_or_none()
+
+
+def _num(value) -> Optional[float]:
+    return float(value) if value is not None else None
+
+
+def _property_summary(snapshot: NsoPropertySnapshot) -> str:
+    parts = [
+        f"Site: {snapshot.site_name}",
+        f"City: {snapshot.city}",
+    ]
+    if snapshot.model:
+        parts.append(f"Model: {snapshot.model}")
+    if snapshot.ca_code:
+        parts.append(f"CA code: {snapshot.ca_code}")
+    if snapshot.rent_type:
+        parts.append(f"Rent type: {snapshot.rent_type}")
+    return " | ".join(parts)
+
+
+async def _property_snapshot(
+    session: AsyncSession, *, site: models.Site,
+) -> NsoPropertySnapshot:
+    details = await _fetch_site_detail(session, site_id=site.id)
+    return NsoPropertySnapshot(
+        site_name=site.name,
+        site_code=site.ca_code or site.code or "",
+        city=site.city,
+        visit_date=site.visit_date,
+        model=site.model,
+        google_maps_pin=site.google_maps_pin,
+        google_maps_url=site.google_maps_url,
+        ca_code=site.ca_code,
+        finance_amount=_num(site.finance_amount),
+        kyc_verified=bool(site.kyc_verified),
+        rent_type=(details.rent_type if details and details.rent_type else site.rent_type),
+        expected_rent=_num(site.expected_rent),
+        expected_revshare_pct=_num(
+            details.rev_share_pct if details and details.rev_share_pct is not None else site.expected_revshare_pct
+        ),
+        expected_escalation_pct=_num(
+            details.escalation_pct if details and details.escalation_pct is not None else site.expected_escalation_pct
+        ),
+        expected_escalation_years=site.expected_escalation_years,
+        score=_num(details.score) if details else None,
+        estimated_monthly_sales=_num(details.estimated_monthly_sales) if details else None,
+        carpet_area_sqft=_num(details.carpet_area_sqft) if details else None,
+        cam_charges=_num(details.cam_charges) if details else None,
+        security_deposit=_num(details.security_deposit) if details else None,
+        brokerage=_num(details.brokerage) if details else None,
+        lock_in_months=details.lock_in_months if details else None,
+        tenure_months=details.tenure_months if details else None,
+        rent_free_days=details.rent_free_days if details else None,
+        nearest_starbucks_m=details.nearest_starbucks_m if details else None,
+        nearest_twc_m=details.nearest_twc_m if details else None,
+    )
 
 
 async def _fetch_nso_or_none(
@@ -84,7 +149,7 @@ def _project_done(project: Optional[models.ProjectReview]) -> bool:
 
 
 def _stage_one_complete(row: models.NsoReview) -> bool:
-    return bool((row.property_details or "").strip()) and row.communication_floated is not None
+    return row.communication_floated is not None
 
 
 def _stage_two_complete(row: models.NsoReview) -> bool:
@@ -234,6 +299,7 @@ async def _state_response(
     project: Optional[models.ProjectReview],
 ) -> NsoStateResponse:
     nso_status, current_stage = _display_rollups(row, project)
+    snapshot = await _property_snapshot(session, site=site)
     return NsoStateResponse(
         site_id=str(site.id),
         site_code=site.ca_code or site.code or "",
@@ -253,6 +319,7 @@ async def _state_response(
         nso_status=nso_status,
         current_stage=current_stage,
         triggers=_triggers(site, row, project),
+        property_snapshot=snapshot,
         property_details=row.property_details,
         communication_floated=row.communication_floated,
         fssai_status=row.fssai_status,
@@ -381,7 +448,11 @@ async def svc_save_stage_one(
             raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY, detail="NSO Stage 1 is locked until Finance / CA is approved.")
         project = await _fetch_project(session, site_id=site.id)
         row = await _fetch_nso_or_create(session, site=site)
-        row.property_details = body.property_details.strip()
+        snapshot = await _property_snapshot(session, site=site)
+        if body.property_details and body.property_details.strip():
+            row.property_details = body.property_details.strip()
+        elif not (row.property_details or "").strip():
+            row.property_details = _property_summary(snapshot)
         row.communication_floated = body.communication_floated
         _sync_rollups(row, project)
         await write_audit_event(

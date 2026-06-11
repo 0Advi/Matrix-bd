@@ -32,6 +32,7 @@ from app.services.project_service import (
     svc_budget_admin_queue,
     svc_finalize_initialization,
     svc_get_project,
+    svc_get_project_budget_admin_detail,
     svc_get_project_history_detail,
     svc_list_project_delegations_for_site,
     svc_nso_queue,
@@ -112,6 +113,16 @@ async def project_budget_admin_queue(
     tenant_id: TenantId,
 ) -> ProjectBudgetAdminQueueResponse:
     return await svc_budget_admin_queue(db, tenant_id=tenant_id)
+
+
+@router.get("/budget-admin-detail/{site_id}", response_model=ProjectStateResponse)
+async def project_budget_admin_detail(
+    site_id: str,
+    db: DbDep,
+    current_user: BusinessAdmin,
+    tenant_id: TenantId,
+) -> ProjectStateResponse:
+    return await svc_get_project_budget_admin_detail(db, tenant_id=tenant_id, site_id=site_id)
 
 
 @router.post("/{site_id}/budget/admin-review", response_model=ProjectStateResponse)
