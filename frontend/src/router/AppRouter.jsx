@@ -27,6 +27,7 @@ import AgreementPage         from '../modules/legal/agreement/AgreementPage.jsx'
 import DesignQueuePage       from '../modules/design/DesignQueuePage.jsx';
 import DesignReviewPage      from '../modules/design/DesignReviewPage.jsx';
 import ModuleHistoryPage     from '../modules/module-history/ModuleHistoryPage.jsx';
+import ModuleProcessFlowPage from '../modules/module-process-flow/ModuleProcessFlowPage.jsx';
 import SiteStatusPage        from '../modules/bd/site-status/SiteStatusPage.jsx';
 import DdFailedPage          from '../modules/bd/dd-failed/DdFailedPage.jsx';
 import SiteTrackerListPage   from '../modules/bd/site-tracker/SiteTrackerListPage.jsx';
@@ -68,14 +69,24 @@ function homeForRoleModule(role, module) {
 
 function RequireAuth({ children }) {
   const token = useAuthToken();
-  const { role } = useSession();
+  const { role, authReady } = useSession();
   if (USE_MOCK) return children; // mock mode is always "signed in"
   if (!token)   return <Navigate to={LANDING_PATH} replace/>;
+  // Block the authed shell until /auth/whoami resolves. This single gate keeps
+  // IndexRedirect and every nested module/role guard from evaluating the
+  // pre-hydration default session ('supervisor', module=null) on refresh /
+  // deep-link, which otherwise misroutes module users and strands execs. (#114)
+  if (!authReady) return <HydratingFallback/>;
   // Business admins have no presence in the tenant app shell — their entire
   // surface lives at /business-admin. Forward them out of any BD/legal/payment
   // route so they cannot land on a chrome that isn't meant for them.
   if (role === 'business_admin') return <Navigate to="/business-admin" replace/>;
   return children;
+}
+
+function HydratingFallback() {
+  // Neutral full-height placeholder while the session hydrates.
+  return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', opacity: 0.6 }}>Loading…</div>;
 }
 
 function LandingFallback() {
@@ -205,6 +216,20 @@ export default function AppRouter() {
             </RequireModule>
           </RequireRole>
         }/>
+        <Route path={ROUTES.LEGAL_PROCESS_FLOW} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['legal']}>
+              <ModuleProcessFlowPage moduleKey="legal"/>
+            </RequireModule>
+          </RequireRole>
+        }/>
+        <Route path={ROUTES.LEGAL_PROCESS_FLOW_SITE} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['legal']}>
+              <ModuleProcessFlowPage moduleKey="legal"/>
+            </RequireModule>
+          </RequireRole>
+        }/>
         <Route path={ROUTES.LEGAL_SITE_DDR} element={
           <RequireRole roles={['supervisor', 'executive', 'exec']}>
             <RequireModule modules={['legal']}>
@@ -274,6 +299,20 @@ export default function AppRouter() {
             </RequireModule>
           </RequireRole>
         }/>
+        <Route path={ROUTES.DESIGN_PROCESS_FLOW} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['design']}>
+              <ModuleProcessFlowPage moduleKey="design"/>
+            </RequireModule>
+          </RequireRole>
+        }/>
+        <Route path={ROUTES.DESIGN_PROCESS_FLOW_SITE} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['design']}>
+              <ModuleProcessFlowPage moduleKey="design"/>
+            </RequireModule>
+          </RequireRole>
+        }/>
         <Route path="/design/*" element={<Navigate to={ROUTES.DESIGN} replace/>}/>
 
         <Route path={ROUTES.PROJECT} element={
@@ -318,6 +357,20 @@ export default function AppRouter() {
             </RequireModule>
           </RequireRole>
         }/>
+        <Route path={ROUTES.PROJECT_PROCESS_FLOW} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['project']}>
+              <ModuleProcessFlowPage moduleKey="project"/>
+            </RequireModule>
+          </RequireRole>
+        }/>
+        <Route path={ROUTES.PROJECT_PROCESS_FLOW_SITE} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['project']}>
+              <ModuleProcessFlowPage moduleKey="project"/>
+            </RequireModule>
+          </RequireRole>
+        }/>
         <Route path="/project/*" element={<Navigate to={ROUTES.PROJECT} replace/>}/>
 
         <Route path={ROUTES.NSO} element={
@@ -352,6 +405,20 @@ export default function AppRouter() {
           <RequireRole roles={['supervisor', 'executive', 'exec']}>
             <RequireModule modules={['nso']}>
               <ModuleHistoryPage moduleKey="nso"/>
+            </RequireModule>
+          </RequireRole>
+        }/>
+        <Route path={ROUTES.NSO_PROCESS_FLOW} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['nso']}>
+              <ModuleProcessFlowPage moduleKey="nso"/>
+            </RequireModule>
+          </RequireRole>
+        }/>
+        <Route path={ROUTES.NSO_PROCESS_FLOW_SITE} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['nso']}>
+              <ModuleProcessFlowPage moduleKey="nso"/>
             </RequireModule>
           </RequireRole>
         }/>

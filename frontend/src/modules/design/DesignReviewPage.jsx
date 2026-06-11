@@ -11,9 +11,12 @@ import {
 } from '../../services/api/designApi.js';
 import { useSiteDataRefresh } from '../../hooks/useSiteDataRefresh.js';
 
-const KINDS = ['recce', '2d', '3d', 'boq'];
+// Stage order: recce → 2d → 3d → GFC gate → boq
+// GFC is rendered as a card between 3D and BOQ, so we split into two groups.
+const KINDS_BEFORE_GFC = ['recce', '2d', '3d'];
+const KINDS_AFTER_GFC  = ['boq'];
 const KIND_LABEL = { recce: 'Recce', '2d': '2D design', '3d': '3D design', boq: 'BOQ + estimate' };
-const KIND_NUM = { recce: '01', '2d': '02', '3d': '03', boq: '04' };
+const KIND_NUM = { recce: '01', '2d': '02', '3d': '03', boq: '05' };
 
 const DELIV_TONE = {
   pending:   { label: 'Not uploaded', color: 'var(--zm-fg-3)' },
@@ -284,6 +287,10 @@ export default function DesignReviewPage() {
   const [team, setTeam] = React.useState([]);
   const [allocation, setAllocation] = React.useState(null);
   const [chosenExec, setChosenExec] = React.useState('');
+  // Non-blocking action errors (replaces window.alert, which froze the tab) (#138)
+  const [actionError, setActionError] = React.useState(null);
+  // Surfaces a team/allocation load failure instead of a silently empty dropdown (#142)
+  const [teamError, setTeamError] = React.useState(null);
 
   const load = React.useCallback(async ({ silent = false } = {}) => {
     // Background refreshes (window 'focus' / visibility / data events) MUST be
@@ -318,41 +325,48 @@ export default function DesignReviewPage() {
     if (!isSupervisor) return;
     let cancelled = false;
     (async () => {
-      try { const t = await listMyTeam('design'); if (!cancelled) setTeam(t); } catch { /* silent */ }
-      try { const d = await listDesignDelegationsForSite(siteId); if (!cancelled) setAllocation(d.items?.[0] || null); } catch { /* silent */ }
+      if (!cancelled) setTeamError(null);
+      try { const t = await listMyTeam('design'); if (!cancelled) setTeam(t); }
+      catch { if (!cancelled) setTeamError('Could not load your design team — refresh to retry.'); }
+      try { const d = await listDesignDelegationsForSite(siteId); if (!cancelled) setAllocation(d.items?.[0] || null); }
+      catch { if (!cancelled) setTeamError('Could not load the current allocation — refresh to retry.'); }
     })();
     return () => { cancelled = true; };
   }, [isSupervisor, siteId, designStatus]);
 
   const onAllocate = async () => {
     if (!chosenExec) return;
+    setActionError(null);
     setBusy(true);
     try {
       const r = await allocateDesign(siteId, chosenExec);
       setReview(r); setChosenExec('');
       const d = await listDesignDelegationsForSite(siteId);
       setAllocation(d.items?.[0] || null);
-    } catch (err) { window.alert(err?.detail || err?.message || 'Allocation failed'); }
+    } catch (err) { setActionError(err?.detail || err?.message || 'Allocation failed'); }
     finally { setBusy(false); }
   };
 
   const onRevoke = async () => {
     if (!allocation) return;
+    setActionError(null);
     setBusy(true);
     try { await revokeDesignAllocation(siteId, allocation.delegateUserId); setAllocation(null); await load(); }
-    catch (err) { window.alert(err?.detail || err?.message || 'Revoke failed'); }
+    catch (err) { setActionError(err?.detail || err?.message || 'Revoke failed'); }
     finally { setBusy(false); }
   };
 
   const onSubmit = async (kind, payload) => {
+    setActionError(null);
     setBusy(true);
     try { const r = await submitDeliverable(siteId, kind, payload); setReview(r); }
-    catch (err) { window.alert(err?.detail || err?.message || 'Submit failed'); }
+    catch (err) { setActionError(err?.detail || err?.message || 'Submit failed'); }
     finally { setBusy(false); }
   };
 
   const onUpload = async (kind, file) => {
     if (!file) return;
+    setActionError(null);
     setBusy(true);
     try {
       const r = await uploadDeliverable(siteId, kind, file);
@@ -361,17 +375,18 @@ export default function DesignReviewPage() {
       // (status flips to 'submitted'), so we don't need to reset local file
       // state explicitly — the card unmounts/remounts with fresh state.
     }
-    catch (err) { window.alert(err?.detail || err?.message || 'Upload failed'); }
+    catch (err) { setActionError(err?.detail || err?.message || 'Upload failed'); }
     finally { setBusy(false); }
   };
 
   const onReview = async (kind, payload) => {
     if (payload.decision === 'reject' && !payload.comments?.trim()) {
-      window.alert('Comments are required to send a deliverable back.'); return;
+      setActionError('Comments are required to send a deliverable back.'); return;
     }
+    setActionError(null);
     setBusy(true);
     try { const r = await reviewDeliverable(siteId, kind, payload); setReview(r); }
-    catch (err) { window.alert(err?.detail || err?.message || 'Review failed'); }
+    catch (err) { setActionError(err?.detail || err?.message || 'Review failed'); }
     finally { setBusy(false); }
   };
 
@@ -394,6 +409,12 @@ export default function DesignReviewPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {actionError && (
+        <div className="zm-glass" role="alert" style={{ padding: 12, color: 'var(--zm-danger)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <span>{actionError}</span>
+          <button type="button" onClick={() => setActionError(null)} style={{ ...btn('var(--zm-surface-2)'), color: 'var(--zm-fg-2)' }}>Dismiss</button>
+        </div>
+      )}
       <PageHeader
         file={`Site · ${r.siteCode || ''}`}
         eyebrow="Design module"
@@ -412,6 +433,7 @@ export default function DesignReviewPage() {
           <div style={{ fontFamily: 'var(--zm-font-body)', fontWeight: 800, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--zm-fg-3)', marginBottom: 10 }}>
             Allocation
           </div>
+          {teamError && <div style={{ fontSize: 12, color: 'var(--zm-danger)', marginBottom: 8 }}>{teamError}</div>}
           {allocation ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <Badge label={`Allocated · ${allocation.delegateName || allocation.delegateEmail}`} color="var(--zm-accent)"/>
@@ -441,9 +463,9 @@ export default function DesignReviewPage() {
         </div>
       )}
 
-      {/* Deliverables */}
+      {/* Deliverables before GFC: recce → 2d → 3d */}
       <div style={{ display: 'grid', gap: 12 }}>
-        {KINDS.map((kind) => (
+        {KINDS_BEFORE_GFC.map((kind) => (
           <DeliverableCard
             key={kind}
             kind={kind}
@@ -460,10 +482,15 @@ export default function DesignReviewPage() {
         ))}
       </div>
 
-      {/* GFC gate (read-only here — the business admin approves it in their portal) */}
-      <div className="zm-glass" style={{ borderRadius: 12, padding: 16 }}>
+      {/* GFC gate — sits between 3D and BOQ (read-only here; admin approves from their portal) */}
+      <div className="zm-glass" style={{
+        borderRadius: 12, padding: 16,
+        opacity: ['pending', 'allocated', 'in_progress'].includes(r.designStatus) && r.currentStage !== 'gfc' && r.gfcStatus === 'pending' ? 0.55 : 1,
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <span style={{ fontFamily: 'var(--zm-font-mono)', fontSize: 11, color: 'var(--zm-fg-3)' }}>04</span>
           <strong style={{ fontFamily: 'var(--zm-font-body)', fontSize: 14, color: 'var(--zm-fg)' }}>GFC · Good-For-Construction</strong>
+          {r.currentStage === 'gfc' && <Badge label="Active" color="var(--zm-accent)"/>}
           <span style={{ marginLeft: 'auto' }}>
             <Badge
               label={r.gfcStatus === 'approved' ? 'Approved' : r.gfcStatus === 'rejected' ? 'Sent back' : (r.designStatus === 'gfc_pending' ? 'Awaiting admin' : 'Pending')}
@@ -473,16 +500,37 @@ export default function DesignReviewPage() {
         </div>
         <p style={{ margin: 0, fontFamily: 'var(--zm-font-body)', fontSize: 12.5, color: 'var(--zm-fg-3)' }}>
           {r.designStatus === 'gfc_pending'
-            ? 'BOQ approved — the business admin gives the final GFC sign-off from the Business Admin portal.'
+            ? '3D design approved — the business admin gives Good-For-Construction sign-off from the Business Admin portal.'
             : r.gfcStatus === 'approved'
-              ? 'Design complete — Good-For-Construction approved.'
-              : 'Becomes active once the BOQ is approved.'}
+              ? 'GFC approved — proceed to BOQ + estimate upload.'
+              : r.gfcStatus === 'rejected'
+                ? '3D design was sent back for revision after GFC rejection.'
+                : 'Becomes active once 3D design is approved.'}
         </p>
         {r.gfcComments && (
           <div style={{ marginTop: 8, fontFamily: 'var(--zm-font-body)', fontSize: 12, color: 'var(--zm-fg-2)', background: 'var(--zm-surface-2)', borderRadius: 7, padding: '8px 10px' }}>
             <strong>Admin:</strong> {r.gfcComments}
           </div>
         )}
+      </div>
+
+      {/* Deliverables after GFC: boq */}
+      <div style={{ display: 'grid', gap: 12 }}>
+        {KINDS_AFTER_GFC.map((kind) => (
+          <DeliverableCard
+            key={kind}
+            kind={kind}
+            deliverable={deliverableFor(kind)}
+            isActive={r.currentStage === kind}
+            isExecutive={isExecutive}
+            isSupervisor={isSupervisor}
+            canSelfUpload={isSupervisor && !allocation}
+            busy={busy}
+            onSubmit={onSubmit}
+            onUpload={onUpload}
+            onReview={onReview}
+          />
+        ))}
       </div>
     </div>
   );

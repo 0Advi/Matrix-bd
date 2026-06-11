@@ -6,6 +6,7 @@ the source of truth for the external triggers.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
@@ -29,6 +30,9 @@ from app.domain.schemas.nso import (
 )
 from app.services._common import fetch_site_or_404, fetch_user_name
 from app.services.audit_service import write_audit_event
+from app.services.launch_service import svc_create_launch_approval
+
+logger = logging.getLogger(__name__)
 
 
 LICENSE_FIELDS = (
@@ -339,6 +343,8 @@ async def _state_response(
         stage_three_completed_at=row.stage_three_completed_at,
         final_approved_at=row.final_approved_at,
         updated_at=row.updated_at,
+        is_launched=bool(site.is_launched),
+        launched_at=site.launched_at,
     )
 
 
@@ -543,4 +549,13 @@ async def svc_final_approval(
             action="nso_final_approved",
             detail="NSO final approval complete.",
         )
+        # Kick off the post-NSO launch approval chain. Isolated in its own
+        # try/except (and a SAVEPOINT inside the service) so a launch_approvals
+        # insert failure can NEVER roll back the NSO completion we just made (#141).
+        try:
+            await svc_create_launch_approval(session, site=site, tenant_id=tenant_id)
+        except Exception:
+            logger.exception(
+                "Could not create launch_approval for site %s — NSO approval still committed", site.id,
+            )
         return await _state_response(session, site, row, project)
