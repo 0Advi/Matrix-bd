@@ -46,7 +46,10 @@ function ReviewRow({ item, onReview }) {
       <span style={{ fontFamily: 'var(--zm-font-mono)', fontSize: 11.5, color: 'var(--zm-fg-3)' }}>{item.site_code || '—'}</span>
       <span style={{ fontFamily: 'var(--zm-font-body)', fontSize: 13, fontWeight: 600, color: 'var(--zm-fg)' }}>{item.site_name}</span>
       <span style={{ fontFamily: 'var(--zm-font-body)', fontSize: 13, color: 'var(--zm-fg)' }}>{item.city}</span>
-      <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+      <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--zm-accent)', background: 'var(--zm-accent-soft)' }}>
+          {item.status === 'under_supervisor_review' ? 'Supervisor stage' : 'Creator stage'}
+        </span>
         {verdictPills.length === 0 && <span style={{ fontFamily: 'var(--zm-font-body)', fontSize: 12, color: 'var(--zm-fg-3)' }}>Awaiting your review</span>}
         {verdictPills.map(({ who, v }) => {
           const color = v === 'approved' ? 'var(--zm-success)' : 'var(--zm-danger)';
@@ -58,7 +61,7 @@ function ReviewRow({ item, onReview }) {
         })}
       </span>
       <span>
-        <button onClick={() => onReview(item.site_id)}
+        <button onClick={() => onReview(item)}
           style={{ height: 32, padding: '0 16px', borderRadius: 8, border: '1px solid var(--zm-accent)', background: 'var(--zm-accent)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
           Review
         </button>
@@ -76,7 +79,7 @@ export default function LaunchPage() {
   const [tab, setTab] = React.useState('nso');
 
   const [approvalQueue, setApprovalQueue] = React.useState({ loading: true, items: [], error: null });
-  const [reviewSiteId, setReviewSiteId] = React.useState(null);
+  const [review, setReview] = React.useState(null); // { siteId, role: 'exec' | 'supervisor' }
 
   const isExec = role === 'exec' || role === 'executive';
   const isSupervisor = role === 'supervisor';
@@ -106,21 +109,26 @@ export default function LaunchPage() {
 
   React.useEffect(() => { loadApprovals(); }, [loadApprovals]);
 
-  // Enrich queue items with the creator (from the NSO rows, joined on site id) so
-  // exec scope filtering works; the queue endpoint itself is creator-agnostic.
-  const rowById = React.useMemo(() => new Map(allRows.map((r) => [String(r.id), r])), [allRows]);
-  const reviewStatus = isSupervisor ? 'under_supervisor_review' : 'under_exec_review';
-  let reviewItems = approvalQueue.items
-    .filter((i) => i.status === reviewStatus)
-    .map((i) => ({ ...i, createdBy: rowById.get(String(i.site_id))?.createdBy }));
-  if (isExec) reviewItems = filterByScope(reviewItems, role, user);
+  // Stage 1 — sites I CREATED, awaiting my (creator) review. Role-agnostic: the
+  // creator may be an executive OR a supervisor (supervisors can create via
+  // delegation). Scoped reliably by submitted_by from the backend queue, not a
+  // fragile join against the NSO list.
+  const myId = String(user?.id || user?.userId || '');
+  const creatorItems = approvalQueue.items.filter(
+    (i) => i.status === 'under_exec_review' && String(i.submitted_by || '') === myId,
+  );
+  // Stage 2 — supervisor review (any supervisor in the tenant).
+  const supervisorItems = isSupervisor
+    ? approvalQueue.items.filter((i) => i.status === 'under_supervisor_review')
+    : [];
+  const reviewItems = [...creatorItems, ...supervisorItems];
 
   const launchedItems = approvalQueue.items.filter((i) => i.status === 'launched');
 
   const showReview = isExec || isSupervisor;
   const TABS = [
     { key: 'nso',       label: 'NSO Sites', count: rows.length },
-    ...(showReview ? [{ key: 'review', label: isSupervisor ? 'Supervisor Review' : 'My Review', count: reviewItems.length }] : []),
+    ...(showReview ? [{ key: 'review', label: 'Review', count: reviewItems.length }] : []),
     { key: 'launched',  label: 'Launched',  count: launchedItems.length },
   ];
 
@@ -229,9 +237,7 @@ export default function LaunchPage() {
         <div style={{ background: 'var(--zm-surface)', border: '1px solid var(--zm-line)', borderRadius: 12, overflow: 'hidden', boxShadow: 'var(--zm-shadow-1)' }}>
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--zm-line)', background: 'var(--zm-surface-2)' }}>
             <div style={{ fontFamily: 'var(--zm-font-body)', fontSize: 13, color: 'var(--zm-fg-2)' }}>
-              {isSupervisor
-                ? 'The executive has reviewed these sites. Adjust rent if needed, then approve or reject with a comment — it flows to the admin for the final confirm.'
-                : 'The admin has sent these sites you created for your review. Approve or reject the rent terms with a comment — it flows on to your supervisor.'}
+              Sites awaiting your review. <strong>Creator-stage</strong> rows (sites you created) are read-only — approve or reject the rent with a comment, and it flows to a supervisor. <strong>Supervisor-stage</strong> rows let you adjust the rent before approving / rejecting, and it flows to the admin's final confirm.
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '0.8fr 1.5fr 0.9fr 1.4fr auto', gap: 12, padding: '9px 16px', borderBottom: '1px solid var(--zm-line)', fontFamily: 'var(--zm-font-body)', fontWeight: 600, fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--zm-fg-3)' }}>
@@ -244,7 +250,8 @@ export default function LaunchPage() {
           )}
 
           {!approvalQueue.loading && reviewItems.map((item) => (
-            <ReviewRow key={item.site_id} item={item} onReview={setReviewSiteId} />
+            <ReviewRow key={item.site_id} item={item}
+              onReview={(it) => setReview({ siteId: it.site_id, role: it.status === 'under_supervisor_review' ? 'supervisor' : 'exec' })} />
           ))}
 
           {!approvalQueue.loading && reviewItems.length === 0 && (
@@ -283,11 +290,11 @@ export default function LaunchPage() {
         </div>
       )}
 
-      {reviewSiteId && (
+      {review && (
         <LaunchReviewModal
-          siteId={reviewSiteId}
-          role={isSupervisor ? 'supervisor' : 'exec'}
-          onClose={() => setReviewSiteId(null)}
+          siteId={review.siteId}
+          role={review.role}
+          onClose={() => setReview(null)}
           onDone={() => { loadApprovals(); refreshNso(); }}
         />
       )}

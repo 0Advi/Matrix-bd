@@ -373,8 +373,10 @@ async def svc_get_launch_queue(
     tenant_id: str | UUID,
     status_filter: Optional[str] = None,
 ) -> LaunchQueueResponse:
-    q = select(models.LaunchApproval, models.Site).join(
+    q = select(models.LaunchApproval, models.Site, models.User.name).join(
         models.Site, models.Site.id == models.LaunchApproval.site_id
+    ).join(
+        models.User, models.User.id == models.Site.submitted_by, isouter=True
     ).where(models.LaunchApproval.tenant_id == tenant_id)
 
     if status_filter:
@@ -389,6 +391,8 @@ async def svc_get_launch_queue(
             site_name=site.name,
             city=site.city,
             status=approval.status,
+            submitted_by=str(site.submitted_by) if site.submitted_by else None,
+            created_by_name=creator_name,
             exec_verdict=approval.exec_verdict,
             supervisor_verdict=approval.supervisor_verdict,
             updated_at=approval.updated_at,
@@ -398,7 +402,7 @@ async def svc_get_launch_queue(
             committed_at=approval.committed_at,
             launched_at=approval.launched_at,
         )
-        for approval, site in rows
+        for approval, site, creator_name in rows
     ]
     return LaunchQueueResponse(items=items, total=len(items))
 

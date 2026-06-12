@@ -43,7 +43,10 @@ router = APIRouter(prefix="/launch-approvals", tags=["Launch Approvals"])
 
 AdminUser = Annotated[dict, Depends(require_role(Role.BUSINESS_ADMIN))]
 EditorUser = Annotated[dict, Depends(require_role(Role.BUSINESS_ADMIN, Role.SUPERVISOR))]
-ExecUser = Annotated[dict, Depends(require_role(Role.EXECUTIVE))]
+# The first review stage is the SITE CREATOR — who may be an executive OR a
+# supervisor (supervisors can create pipelines via delegation). Role is checked
+# here; svc_exec_review additionally enforces that the actor is the creator.
+CreatorUser = Annotated[dict, Depends(require_role(Role.EXECUTIVE, Role.SUPERVISOR))]
 SupervisorUser = Annotated[dict, Depends(require_role(Role.SUPERVISOR))]
 AnyUser = Annotated[dict, Depends(require_role(Role.BUSINESS_ADMIN, Role.SUPERVISOR, Role.EXECUTIVE))]
 
@@ -104,10 +107,11 @@ async def exec_review(
     site_id: str,
     body: LaunchReviewRequest,
     db: DbDep,
-    current_user: ExecUser,
+    current_user: CreatorUser,
     tenant_id: TenantId,
 ) -> LaunchApprovalResponse:
-    """Creating executive records Approve / Reject (+ comment). Flows forward."""
+    """The site CREATOR (executive or supervisor) records Approve / Reject
+    (+ comment). The service enforces creator-only. Flows forward."""
     return await svc_exec_review(db, tenant_id=tenant_id, actor=current_user, site_id=site_id, body=body)
 
 

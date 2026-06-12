@@ -203,6 +203,10 @@ class LaunchQueueItem(BaseModel):
     site_name: str
     city: str
     status: str
+    # The site creator (executive OR supervisor — supervisors can create via
+    # delegation). The first review stage is gated to this person, role-agnostic.
+    submitted_by: Optional[str] = None
+    created_by_name: Optional[str] = None
     exec_verdict: Optional[str] = None
     supervisor_verdict: Optional[str] = None
     updated_at: Optional[datetime] = None

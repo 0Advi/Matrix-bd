@@ -179,6 +179,23 @@ async def test_exec_review_blocks_non_creator_403(make_session, fake_result):
     assert ei.value.status_code == 403
 
 
+async def test_exec_review_allows_supervisor_creator(make_session, fake_result):
+    # The first review stage is role-agnostic: a SUPERVISOR who created the site
+    # (supervisors can create via delegation) must be able to review it. Regression
+    # for "after send-for-review it never reached the creator" (creator was a supervisor).
+    creator_id = uuid.uuid4()
+    site = _site(submitted_by=creator_id)
+    appr = _appr(site, status="under_exec_review")
+    sess = make_session(fake_result(scalar=site), fake_result(scalar=appr))
+    resp = await L.svc_exec_review(
+        sess, tenant_id=site.tenant_id,
+        actor={"sub": str(creator_id), "role": "supervisor", "name": "Supervisor-creator"},
+        site_id=site.id, body=LaunchReviewRequest(verdict="approved"),
+    )
+    assert resp.status == "under_supervisor_review"
+    assert resp.exec_verdict == "approved"
+
+
 async def test_launch_wrong_status_422(make_session, fake_result):
     site = _site()
     appr = _appr(site, status="pending_admin_final")  # not ready_to_launch

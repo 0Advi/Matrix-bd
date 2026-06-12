@@ -133,7 +133,7 @@ export default function LaunchReviewModal({ siteId, role, onClose, onDone }) {
         <header style={{ padding: '18px 26px', background: 'var(--zm-surface)', borderBottom: '1px solid var(--zm-line)', display: 'flex', alignItems: 'flex-start', gap: 16 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <span style={{ fontFamily: 'var(--zm-font-body)', fontWeight: 600, fontSize: 10.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--zm-accent)' }}>
-              {isSupervisor ? 'Supervisor review' : 'Executive review'}
+              {isSupervisor ? 'Supervisor review' : 'Creator review'}
             </span>
             <h2 style={{ margin: '4px 0 4px', fontFamily: 'var(--zm-font-display)', fontWeight: 700, fontSize: 21, letterSpacing: '-0.02em', color: 'var(--zm-fg)' }}>
               {loading ? 'Loading…' : `${d?.site_code || ''} · ${d?.site_name || ''}`}
