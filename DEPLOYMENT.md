@@ -41,8 +41,8 @@ If both queries return rows, you're good.
 
 1. Sign in to https://railway.app → **New Project → Deploy from GitHub repo → Adityashandilya555/Matrix-bd**.
 2. **Root directory**: `backend`
-3. **Build command** (Settings → Build): `pip install -e .`
-4. **Start command** (Settings → Deploy): `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+3. **Build command** (Settings → Build): `pip install -c requirements.lock.txt setuptools wheel && pip install --no-build-isolation -c requirements.lock.txt -e .`
+4. **Start command** (Settings → Deploy): `uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips '*'`
 5. **Variables** tab — paste these. **Do not commit them anywhere; set only in Railway:**
 
    | Key | Value |
@@ -65,7 +65,16 @@ If both queries return rows, you're good.
    | `PLATFORM_ADMIN_TOKEN` | *Aditya's `.env` line 47. This gates `POST /api/tenancy/requests/{id}/approve` — keep it secret. Rotate via `python -c "import secrets; print(secrets.token_urlsafe(32))"` and replace.* |
 
 6. **Networking** tab → **Generate Domain**. Note the URL (e.g. `https://matrix-bd-production.up.railway.app`).
-7. **Smoke test** the backend:
+7. **Proxy header note**: keep `--proxy-headers --forwarded-allow-ips '*'` in the start command. Railway terminates TLS/proxy traffic before Uvicorn; these flags let FastAPI/Uvicorn trust `X-Forwarded-*` headers so request logging, real client IP capture, and future rate limiting see the forwarded client address instead of only the internal Railway proxy.
+8. **Dependency lock note**: backend dependencies are pinned in `backend/requirements.lock.txt`. Refresh it only when intentionally updating dependencies:
+   ```bash
+   cd backend
+   python3 -m venv /tmp/matrix-backend-lock
+   /tmp/matrix-backend-lock/bin/python -m pip install --upgrade pip
+   /tmp/matrix-backend-lock/bin/python -m pip install -e .
+   /tmp/matrix-backend-lock/bin/python -m pip freeze --exclude-editable > requirements.lock.txt
+   ```
+9. **Smoke test** the backend:
    ```bash
    curl https://<your-railway-domain>/api/health
    curl https://<your-railway-domain>/api/health/db
