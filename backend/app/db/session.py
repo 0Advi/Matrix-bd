@@ -82,10 +82,21 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     The session is rolled back if an exception escapes the route and is closed
     in all cases. Services either commit at their own boundary or use the
     `transaction()` helper below.
+
+    On a SUCCESSFUL request we also commit any transaction still open on the
+    session. Normally `transaction()` already committed, so this is a no-op —
+    but a read performed earlier in the request (notably the per-request
+    is_active check in get_current_user) auto-begins a transaction, and
+    `transaction()` then nests a SAVEPOINT inside it that does NOT commit the
+    outer txn. Without this commit those writes were silently rolled back on
+    close — the bug that froze every write. Committing here is the durable,
+    all-modules safety net; an errored request still rolls back via `except`.
     """
     session = SessionLocal()
     try:
         yield session
+        if session.in_transaction():
+            await session.commit()
     except Exception:
         await session.rollback()
         raise

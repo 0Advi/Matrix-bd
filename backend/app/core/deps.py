@@ -66,6 +66,15 @@ async def get_current_user(
     if not row or not row["is_active"]:
         raise AuthError("Account is inactive or no longer exists. Sign in again.")
     claims["role"] = row["role"]
+    # The is_active SELECT above AUTO-BEGAN a transaction on the request-scoped
+    # session (SQLAlchemy 2.0 autobegin). If left open, the service-layer
+    # transaction() helper sees in_transaction()==True and opens a SAVEPOINT
+    # (begin_nested) inside it instead of a real transaction — and releasing a
+    # savepoint does NOT commit the outer txn, so EVERY write was silently
+    # rolled back when the session closed (regression from adding this
+    # per-request check, #103). Release the read-only txn here so the write path
+    # opens a real, committing transaction. Rolling back a read discards nothing.
+    await db.rollback()
     return claims
 
 
