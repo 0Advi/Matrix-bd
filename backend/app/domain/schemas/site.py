@@ -11,18 +11,41 @@ from app.domain.state_machine import SiteStatus
 RentType = Literal["fixed", "revshare", "mg_revshare"]
 
 
+# Schemes that execute or embed code when rendered as an <a href>. Blocking
+# THESE — not "anything that isn't http(s)" — is the real stored-XSS guard from
+# #87 (the value is shown as a link to other users in SiteDrawer / NsoReviewPage).
+_DANGEROUS_URL_SCHEMES = (
+    "javascript:", "data:", "vbscript:", "file:", "blob:", "about:", "mailto:",
+)
+
+
 def _validate_http_url(v: Optional[str]) -> Optional[str]:
-    """Scheme allowlist for user-pasted URLs (#87). The value is rendered back
-    as an <a href> in SiteDrawer / NsoReviewPage for OTHER users, so a stored
-    `javascript:` URL is stored XSS. Only http(s) links are plausible Maps URLs."""
+    """Normalise + scheme-guard a user-pasted Google Maps URL.
+
+    The original #87 guard rejected anything not starting with http(s):// — but
+    users routinely paste a *bare* link (``google.com/maps/…``,
+    ``maps.app.goo.gl/…``) with no scheme, which made every such create fail
+    with a 422. We instead:
+
+      * reject the dangerous schemes that are the actual XSS vector,
+      * pass through real http(s) URLs unchanged,
+      * reject any *other* explicit scheme (ftp:, custom:, …), and
+      * coerce a scheme-less link to https:// so the stored value is always a
+        safe http(s) href — restoring the pre-#87 paste-and-go behaviour.
+    """
     if v is None:
         return v
     v = v.strip()
     if not v:
         return None
-    if not v.lower().startswith(("http://", "https://")):
+    low = v.lower()
+    if low.startswith(_DANGEROUS_URL_SCHEMES):
         raise ValueError("google_maps_url must be an http(s) URL")
-    return v
+    if low.startswith(("http://", "https://")):
+        return v
+    if "://" in v:  # some other explicit scheme we don't trust to render
+        raise ValueError("google_maps_url must be an http(s) URL")
+    return "https://" + v
 
 
 # ── Request models ─────────────────────────────────────────────────────────────

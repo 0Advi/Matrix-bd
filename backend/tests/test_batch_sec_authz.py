@@ -322,6 +322,33 @@ def test_create_draft_accepts_https_maps_url():
     assert req.google_maps_url == "https://maps.app.goo.gl/abc123"
 
 
+def test_create_draft_coerces_schemeless_maps_url():
+    # The common real-world case: a user pastes a bare Maps link with no scheme.
+    # It must NOT 422 (that was the regression) — it is coerced to https so the
+    # pipeline is created and the stored href stays safe.
+    req = CreateDraftRequest(
+        name="s", city="New Delhi", visit_date="2026-06-13",
+        google_maps_url="google.com/maps/place/Foo/@28.67,77.13",
+    )
+    assert req.google_maps_url == "https://google.com/maps/place/Foo/@28.67,77.13"
+
+    req2 = CreateDraftRequest(
+        name="s", city="New Delhi", visit_date="2026-06-13",
+        google_maps_url="maps.app.goo.gl/abc123",
+    )
+    assert req2.google_maps_url == "https://maps.app.goo.gl/abc123"
+
+
+def test_create_draft_rejects_other_explicit_scheme():
+    # A non-http(s) explicit scheme is still rejected (we only auto-fix the
+    # scheme-LESS case, never a deliberate ftp:/custom: link).
+    with pytest.raises(ValidationError):
+        CreateDraftRequest(
+            name="s", city="Mumbai", visit_date="2026-06-01",
+            google_maps_url="ftp://evil.example/x",
+        )
+
+
 async def test_finance_reject_router_role_guard(session):
     from app.routers.sites import finance_reject, _FinanceRejectBody
 
