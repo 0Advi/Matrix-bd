@@ -49,6 +49,24 @@ async def fetch_site_or_404(
     return site
 
 
+async def fetch_site_for_update_or_404(
+    session: AsyncSession, *, site_id: str | UUID, tenant_id: str | UUID,
+) -> models.Site:
+    """Load and row-lock a site for a status-changing workflow mutation."""
+    stmt = (
+        select(models.Site)
+        .where(
+            models.Site.id == site_id,
+            models.Site.tenant_id == tenant_id,
+        )
+        .with_for_update()
+    )
+    site = (await session.execute(stmt)).scalar_one_or_none()
+    if site is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Site not found")
+    return site
+
+
 def assert_executive_owns_site(actor: dict, site: models.Site) -> None:
     """Object-level authorization (#104): executives may only act on sites they
     submitted or are assigned. Mirrors the check `get_site` and the LOI upload

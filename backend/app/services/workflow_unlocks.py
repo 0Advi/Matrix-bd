@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import models
 from app.domain.state_machine import SiteStatus, assert_transition
+from app.services._common import fetch_site_for_update_or_404
 from app.services.audit_service import write_audit_event
 
 
@@ -40,6 +41,14 @@ async def maybe_unlock_design(
     Returns True when a visible state changed. The helper is intentionally safe
     to call after either track completes; duplicate calls become no-ops.
     """
+    if not design_unlock_ready(site):
+        return False
+
+    site = await fetch_site_for_update_or_404(
+        session,
+        site_id=site.id,
+        tenant_id=tenant_id,
+    )
     if not design_unlock_ready(site):
         return False
 

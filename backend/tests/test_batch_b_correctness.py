@@ -6,12 +6,15 @@ Covers:
   #123 membership inserts: pending-state guard + ON CONFLICT idempotency
   #124 login module claim ordered deterministically (no arbitrary LIMIT 1)
   #121 assign-role clears notes + provisions the module membership row
+  #79 workflow transitions lock rows and idempotently seed downstream records
 
 (#141 is validated in test_batch_a_observability.py alongside launch_service.)
 """
 from __future__ import annotations
 
 import inspect
+from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -19,7 +22,7 @@ from pydantic import ValidationError
 from app.domain.schemas.launch import LaunchRentFieldsRequest
 from app.domain.schemas.site import CreateDraftRequest, SaveDetailsRequest
 from app.routers import users as users_router
-from app.services import business_admin_service, supervisor_code_service
+from app.services import _common, bd_service, business_admin_service, supervisor_code_service, workflow_unlocks
 
 
 # ── #166 — rent_type Literal validation ────────────────────────────────────
@@ -188,3 +191,77 @@ async def test_assign_role_provisions_membership_and_clears_notes(make_session, 
     assert "notes" in sess.sql and "NULL" in sess.sql  # notes cleared in UPDATE
     assert sess.commit_count >= 1
     assert out.role == "executive"
+
+
+# ── #79 — state-changing workflow operations lock + seed idempotently ───────
+
+async def test_site_for_update_helper_emits_row_lock(make_session, fake_result):
+    site = SimpleNamespace(id="site", tenant_id="tenant")
+    sess = make_session(fake_result(scalar=site))
+
+    out = await _common.fetch_site_for_update_or_404(
+        sess,
+        site_id="site",
+        tenant_id="tenant",
+    )
+
+    assert out is site
+    assert "FOR UPDATE" in sess.sql
+
+
+def test_bd_status_mutations_use_locked_site_fetch():
+    src = inspect.getsource(bd_service)
+    for fn_name in (
+        "svc_shortlist_draft",
+        "svc_save_details",
+        "svc_submit_details",
+        "svc_approve_shortlist",
+        "svc_push_to_payments",
+        "svc_reject_site",
+        "svc_archive_site",
+        "svc_revive_site",
+    ):
+        fn_src = src[src.index(f"async def {fn_name}"):]
+        next_marker = fn_src.find("\n\n# ──", 1)
+        if next_marker != -1:
+            fn_src = fn_src[:next_marker]
+        assert "fetch_site_for_update_or_404" in fn_src
+
+
+def test_send_to_legal_seeds_dd_checklist_idempotently():
+    src = inspect.getsource(bd_service.svc_push_to_payments)
+    assert "select(models.LegalDdChecklist)" in src
+    assert "existing_legal_dd is None" in src
+
+
+async def test_design_unlock_rechecks_under_row_lock(make_session, fake_result, monkeypatch):
+    site_id = uuid4()
+    tenant_id = uuid4()
+    site = SimpleNamespace(
+        id=site_id,
+        tenant_id=tenant_id,
+        status="legal_approved",
+        legal_dd_status="positive",
+        finance_status="approved",
+        design_status=None,
+        pushed_to_payments_at=None,
+    )
+
+    async def _no_audit(*a, **k):
+        return None
+
+    monkeypatch.setattr(workflow_unlocks, "write_audit_event", _no_audit)
+    sess = make_session(fake_result(scalar=site))
+
+    changed = await workflow_unlocks.maybe_unlock_design(
+        sess,
+        tenant_id=tenant_id,
+        actor={"sub": uuid4(), "name": "Admin"},
+        site=site,
+        reason="test",
+    )
+
+    assert changed is True
+    assert "FOR UPDATE" in sess.sql
+    assert site.design_status == "pending"
+    assert site.status == "pushed_to_payments"

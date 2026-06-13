@@ -14,7 +14,7 @@ from app.domain.schemas.loi import LOIUploadResponse, LOIViewResponse
 from app.domain.state_machine import SiteStatus, assert_transition
 from fastapi import HTTPException, status as http_status
 
-from app.services._common import fetch_site_or_404
+from app.services._common import fetch_site_for_update_or_404, fetch_site_or_404
 from app.services.audit_service import write_audit_event
 from app.services.notification_service import enqueue as notify_enqueue, recipients_for_supervisors
 from app.services.storage_service import safe_object_name, signed_url, upload_bytes
@@ -64,7 +64,7 @@ async def svc_upload_loi(
     async with transaction(session):
         # Re-load inside the write txn and re-assert — the validation above can
         # race a concurrent transition.
-        site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
+        site = await fetch_site_for_update_or_404(session, site_id=site_id, tenant_id=tenant_id)
         assert_transition(SiteStatus(site.status), SiteStatus.LOI_UPLOADED)
 
         session.add(models.SiteFile(

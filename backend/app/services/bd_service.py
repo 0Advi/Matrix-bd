@@ -29,6 +29,7 @@ from app.domain.schemas.common import OkResponse
 from app.domain.schemas.site import SiteResponse
 from app.domain.state_machine import SiteStatus, assert_transition
 from app.services._common import (
+    fetch_site_for_update_or_404,
     fetch_site_or_404,
     fetch_user_name,
     make_site_code,
@@ -182,7 +183,7 @@ async def svc_shortlist_draft(
     site_id: str | UUID,
 ) -> SiteResponse:
     async with transaction(session):
-        site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
+        site = await fetch_site_for_update_or_404(session, site_id=site_id, tenant_id=tenant_id)
         _assert_not_self_approval(actor, site)
         assert_transition(SiteStatus(site.status), SiteStatus.SHORTLISTED)
         site.status = SiteStatus.SHORTLISTED.value
@@ -225,7 +226,7 @@ async def svc_save_details(
     fields. No status transition."""
     details = _normalise_detail_keys(details or {})
     async with transaction(session):
-        site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
+        site = await fetch_site_for_update_or_404(session, site_id=site_id, tenant_id=tenant_id)
         _assert_can_edit_details(actor, site)
         before = {
             "model": site.model,
@@ -279,7 +280,7 @@ async def svc_submit_details(
 ) -> SiteResponse:
     details = _normalise_detail_keys(details or {})
     async with transaction(session):
-        site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
+        site = await fetch_site_for_update_or_404(session, site_id=site_id, tenant_id=tenant_id)
         _assert_can_edit_details(actor, site)
         assert_transition(SiteStatus(site.status), SiteStatus.DETAILS_SUBMITTED)
         if details:
@@ -341,7 +342,7 @@ async def svc_approve_shortlist(
     expected_loi_days: int,
 ) -> SiteResponse:
     async with transaction(session):
-        site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
+        site = await fetch_site_for_update_or_404(session, site_id=site_id, tenant_id=tenant_id)
         current_status = SiteStatus(site.status)
         _assert_not_self_approval(actor, site)
         assert_transition(current_status, SiteStatus.APPROVED)
@@ -399,14 +400,18 @@ async def svc_push_to_payments(
     `/staging/{site_id}/push` is kept unchanged for frontend back-compat.
     """
     async with transaction(session):
-        site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
+        site = await fetch_site_for_update_or_404(session, site_id=site_id, tenant_id=tenant_id)
         assert_transition(SiteStatus(site.status), SiteStatus.LEGAL_REVIEW)
         site.status = SiteStatus.LEGAL_REVIEW.value
         site.legal_review_at = datetime.now(timezone.utc)
 
-        # Seed the DD checklist row so legal team can start filling items immediately
-        legal_dd = models.LegalDdChecklist(site_id=site.id)
-        session.add(legal_dd)
+        # Seed the DD checklist row so legal team can start filling items immediately.
+        # Retried requests or legacy partial transitions must not duplicate it.
+        existing_legal_dd = (await session.execute(
+            select(models.LegalDdChecklist).where(models.LegalDdChecklist.site_id == site.id)
+        )).scalar_one_or_none()
+        if existing_legal_dd is None:
+            session.add(models.LegalDdChecklist(site_id=site.id))
 
         await write_audit_event(
             session, tenant_id=tenant_id, site_id=site.id,
@@ -446,7 +451,7 @@ async def svc_reject_site(
     site_id: str | UUID, reasons: list[str], comment: Optional[str] = None,
 ) -> OkResponse:
     async with transaction(session):
-        site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
+        site = await fetch_site_for_update_or_404(session, site_id=site_id, tenant_id=tenant_id)
         _assert_not_self_approval(actor, site)
         assert_transition(SiteStatus(site.status), SiteStatus.REJECTED)
         site.status = SiteStatus.REJECTED.value
@@ -476,7 +481,7 @@ async def svc_archive_site(
     site_id: str | UUID, note: Optional[str] = None,
 ) -> OkResponse:
     async with transaction(session):
-        site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
+        site = await fetch_site_for_update_or_404(session, site_id=site_id, tenant_id=tenant_id)
         # Archive note is mandatory — see Todo #9. Per the product spec every
         # archived site must carry a reason so the Archive tab is browsable.
         clean_note = (note or "").strip()
@@ -521,7 +526,7 @@ async def svc_revive_site(
             detail="Only the supervisor can revive an archived site.",
         )
     async with transaction(session):
-        site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
+        site = await fetch_site_for_update_or_404(session, site_id=site_id, tenant_id=tenant_id)
         if site.status != SiteStatus.ARCHIVED.value:
             raise HTTPException(
                 status_code=http_status.HTTP_409_CONFLICT,
