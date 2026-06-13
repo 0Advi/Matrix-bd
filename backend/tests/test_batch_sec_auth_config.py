@@ -189,6 +189,12 @@ async def test_reset_confirm_issues_token_and_stores_hash(make_session, fake_res
     from app.core.config import settings as live_settings
     from app.routers.tenancy import confirm_password_reset_request
 
+    # _require_platform_admin compares against effective_platform_admin_token,
+    # which is `platform_admin_token or effective_platform_admin_password`. Pin
+    # the TOKEN (not just the password) or this test 401s on any machine whose
+    # .env sets a real PLATFORM_ADMIN_TOKEN — the token would otherwise win and
+    # the patched password be ignored.
+    monkeypatch.setattr(live_settings, "platform_admin_token", "k")
     monkeypatch.setattr(live_settings, "platform_admin_password", "k")
     sess = make_session(
         fake_result(mappings_rows=[{"id": uuid.uuid4(), "status": "pending", "user_id": USER_ID}]),
