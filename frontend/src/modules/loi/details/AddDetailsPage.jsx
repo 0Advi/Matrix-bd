@@ -256,7 +256,7 @@ export default function AddDetailsPage({ item, onClose, onSubmit, onSaveDraft, s
     const { spocName, spoc_name, ...rest } = f;
     return { ...rest, totalOpCost };
   };
-  const handleSubmit = () => { if (!filled) return; onSubmit(payloadWithoutSpoc()); };
+  const handleSubmit = () => { if (!filled || savingDraft) return; onSubmit(payloadWithoutSpoc()); };
   const handleSaveDraft = () => {
     if (savingDraft) return;
     onSaveDraft?.({ ...payloadWithoutSpoc(), _savedAt: new Date().toISOString() });

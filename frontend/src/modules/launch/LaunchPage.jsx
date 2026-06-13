@@ -101,13 +101,18 @@ export default function LaunchPage() {
     setApprovalQueue((s) => ({ ...s, loading: true }));
     try {
       const d = await getLaunchQueue();
-      setApprovalQueue({ loading: false, items: d.items || [], error: null });
+      if (!cancelledRef.current) setApprovalQueue({ loading: false, items: d.items || [], error: null });
     } catch (e) {
-      setApprovalQueue({ loading: false, items: [], error: e?.detail || e?.message || 'Failed to load' });
+      if (!cancelledRef.current) setApprovalQueue({ loading: false, items: [], error: e?.detail || e?.message || 'Failed to load' });
     }
   }, []);
 
-  React.useEffect(() => { loadApprovals(); }, [loadApprovals]);
+  const cancelledRef = React.useRef(false);
+  React.useEffect(() => {
+    cancelledRef.current = false;
+    loadApprovals();
+    return () => { cancelledRef.current = true; };
+  }, [loadApprovals]);
 
   // Stage 1 — sites I CREATED, awaiting my (creator) review. Role-agnostic: the
   // creator may be an executive OR a supervisor (supervisors can create via

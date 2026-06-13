@@ -182,19 +182,20 @@ async def svc_finance_reject(
     fix the details and re-request approval through the normal chain.
     """
     actor_role = (actor.get("role") or "").lower()
-    if actor_role != "business_admin":
+    if actor_role not in ("business_admin", "supervisor"):
         raise HTTPException(
             http_status.HTTP_403_FORBIDDEN,
-            detail="Only business admins can reject finance.",
+            detail="Only supervisors or business admins can reject finance.",
         )
 
     async with transaction(session):
         site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
 
-        if site.finance_status != "awaiting_admin":
+        allowed = {"awaiting_admin"} if actor_role == "business_admin" else {"awaiting_supervisor"}
+        if site.finance_status not in allowed:
             raise HTTPException(
                 http_status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Expected awaiting_admin, got '{site.finance_status}'.",
+                detail=f"Expected {allowed}, got '{site.finance_status}'.",
             )
 
         site.finance_status = "pending"
@@ -202,9 +203,9 @@ async def svc_finance_reject(
         await write_audit_event(
             session, tenant_id=tenant_id, site_id=site.id,
             actor_id=actor["sub"], actor_name=actor["name"],
-            action="finance_admin_rejected",
+            action=f"finance_{actor_role}_rejected",
             detail=(
-                f"Admin sent finance back for correction. ca_code={site.ca_code}"
+                f"{actor_role.capitalize()} sent finance back for correction. ca_code={site.ca_code}"
                 + (f" reason={reason}" if reason else "")
             ),
         )

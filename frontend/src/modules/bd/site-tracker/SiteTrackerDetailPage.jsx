@@ -7,6 +7,7 @@ import {
   saveFinanceDraft,
   requestFinanceApproval,
   approveFinance,
+  rejectFinance,
 } from '../../../services/api/siteTrackerApi.js';
 import { bdSiteStatusRoute } from '../../../router/routes.js';
 import { agreementStatusLabel, normalizeAgreementStatus } from '../../../lib/agreementStatus.js';
@@ -285,10 +286,13 @@ function FinancePanel({ data, role, onClose, onUpdate }) {
     setAmount(data.financeAmount != null ? String(data.financeAmount) : '');
   }, [data.kycVerified, data.caCode, data.financeAmount, data.financeStatus]);
 
+  const toastTimer = React.useRef(null);
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3500);
   };
+  React.useEffect(() => () => clearTimeout(toastTimer.current), []);
 
   // ── Save draft ────────────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -337,6 +341,22 @@ function FinancePanel({ data, role, onClose, onUpdate }) {
       showToast(err?.detail || err?.message || 'Approval failed.', 'danger');
     } finally {
       setApproving(false);
+    }
+  };
+
+  const [rejecting, setRejecting] = React.useState(false);
+  const handleReject = async () => {
+    const reason = window.prompt('Reason for rejection (optional):');
+    if (reason === null) return; // user cancelled
+    setRejecting(true);
+    try {
+      await rejectFinance(data.siteId, reason || undefined);
+      showToast('Finance sent back for correction.');
+      await onUpdate();
+    } catch (err) {
+      showToast(err?.detail || err?.message || 'Rejection failed.', 'danger');
+    } finally {
+      setRejecting(false);
     }
   };
 
@@ -536,16 +556,30 @@ function FinancePanel({ data, role, onClose, onUpdate }) {
 
             {/* Approve button — supervisor seeing awaiting_supervisor */}
             {canApprove && (
-              <button
-                type="button"
-                onClick={handleApprove}
-                disabled={approving}
-                style={btnStyle(true, approving)}
-              >
-                {approving
-                  ? 'Approving…'
-                  : canApproveSupervisor ? 'Forward to admin' : 'Approve finance'}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleApprove}
+                  disabled={approving || rejecting}
+                  style={btnStyle(true, approving || rejecting)}
+                >
+                  {approving
+                    ? 'Approving…'
+                    : canApproveSupervisor ? 'Forward to admin' : 'Approve finance'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleReject}
+                  disabled={approving || rejecting}
+                  style={{
+                    ...btnStyle(false, approving || rejecting),
+                    color: 'var(--zm-danger, #B91C1C)',
+                    borderColor: 'var(--zm-danger, #B91C1C)',
+                  }}
+                >
+                  {rejecting ? 'Rejecting…' : 'Send back'}
+                </button>
+              </>
             )}
 
             {/* Final approved state */}
@@ -635,14 +669,19 @@ export default function SiteTrackerDetailPage() {
     if (!siteId) return;
     if (!silent) setState((s) => ({ ...s, status: 'loading' }));
     getSiteTrackerView(siteId)
-      .then((data) => setState({ status: 'ready', data, error: null }))
-      .catch((err) => setState({
+      .then((data) => { if (!cancelledRef.current) setState({ status: 'ready', data, error: null }); })
+      .catch((err) => { if (!cancelledRef.current) setState({
         status: 'error', data: null,
         error: err?.detail || err?.message || 'Failed to load site flow',
-      }));
+      }); });
   }, [siteId]);
 
-  React.useEffect(() => { load(); }, [load]);
+  const cancelledRef = React.useRef(false);
+  React.useEffect(() => {
+    cancelledRef.current = false;
+    load();
+    return () => { cancelledRef.current = true; };
+  }, [load]);
   useSiteDataRefresh(React.useCallback(() => load(true), [load]), { siteId });
   React.useEffect(() => {
     // Legal is its own full page now; if a stale ?node=legal link arrives,
