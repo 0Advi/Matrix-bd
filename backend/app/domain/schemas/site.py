@@ -195,6 +195,9 @@ class SiteResponse(BaseModel):
     # straight off GET /sites without a per-site /tracker fan-out.
     finance_status: Optional[str] = None
     kyc_verified: bool = False
+    # Response model: no length/pattern constraint here — output is read straight
+    # from our own DB, so validating it would 500 any legacy row. Input is
+    # validated on _FinanceDraftBody; email sinks are sanitized in finance_service.
     ca_code: Optional[str] = None
     finance_amount: Optional[float] = None
     # LOI SLA tracking (staging view). expected_loi_days comes from the approval
