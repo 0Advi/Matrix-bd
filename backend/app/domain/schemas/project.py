@@ -1,30 +1,22 @@
-"""Schemas for the Project Execution module."""
+"""Schemas for the Project Execution module.
+
+Budget tracking (11 items) has moved to the Project Excellence module (202606134).
+"""
 from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 
 Decision = Literal["approve", "reject"]
-BudgetAction = Literal["save", "submit"]
 MilestoneField = Literal[
     "initialization_date",
     "expected_completion_date",
     "inspection_date",
     "final_completion_date",
 ]
-
-
-class ProjectBudgetItemIn(BaseModel):
-    idx: int = Field(ge=1, le=11)
-    label: Optional[str] = None
-    amount: Optional[float] = Field(default=None, ge=0)
-
-
-class ProjectBudgetItemOut(ProjectBudgetItemIn):
-    id: Optional[str] = None
 
 
 class ProjectQueueItem(BaseModel):
@@ -35,16 +27,11 @@ class ProjectQueueItem(BaseModel):
     design_status: str
     project_status: str
     current_stage: str
-    budget_status: str
     # Drives the Pipeline vs Sites split: a site moves to the "Sites" tab once
     # the executive has uploaded the quality-audit doc (status leaves 'pending').
     quality_audit_status: str = "pending"
     allocated_to_name: Optional[str] = None
     submitted_by_name: Optional[str] = None
-    budget_total: Optional[float] = None
-    total_indoor_area_sqft: Optional[float] = None
-    total_area_sqft: Optional[float] = None
-    covers: Optional[int] = None
 
 
 class ProjectQueueResponse(BaseModel):
@@ -65,14 +52,6 @@ class ProjectStateResponse(BaseModel):
     current_stage: str
     allocated_to: Optional[str] = None
     allocated_to_name: Optional[str] = None
-    budget_status: str
-    budget_total: Optional[float] = None
-    total_indoor_area_sqft: Optional[float] = None
-    total_area_sqft: Optional[float] = None
-    covers: Optional[int] = None
-    budget_items: list[ProjectBudgetItemOut] = Field(default_factory=list)
-    budget_supervisor_comments: Optional[str] = None
-    budget_admin_comments: Optional[str] = None
     initialization_date: Optional[date] = None
     initialization_status: str
     initialization_comments: Optional[str] = None
@@ -113,26 +92,9 @@ class AllocateProjectRequest(BaseModel):
     notes: Optional[str] = None
 
 
-class SaveBudgetRequest(BaseModel):
-    items: list[ProjectBudgetItemIn] = Field(default_factory=list)
-    action: BudgetAction = "save"
-    # Area / cover inputs travel with the budget so they are captured at the
-    # same save/submit step and carried into the approval flow.
-    total_indoor_area_sqft: Optional[float] = Field(default=None, ge=0)
-    total_area_sqft: Optional[float] = Field(default=None, ge=0)
-    covers: Optional[int] = Field(default=None, ge=0)
-
-
 class ReviewRequest(BaseModel):
     decision: Decision
     comments: Optional[str] = None
-
-
-class AdminBudgetReviewRequest(ReviewRequest):
-    # On approve, the business-admin also sets the project initialization date
-    # (the UI defaults this to approval date + 2 days). Optional so a reject
-    # need not carry one; the service defaults it when omitted on approve.
-    initialization_date: Optional[date] = None
 
 
 class MilestoneRequest(BaseModel):
@@ -155,11 +117,6 @@ class MidVisitRequest(BaseModel):
     value: date
 
 
-class ProjectBudgetAdminQueueResponse(BaseModel):
-    items: list[ProjectQueueItem]
-    total: int
-
-
 class ProjectHistoryItem(BaseModel):
     """Read-only history row for every site that entered Project."""
     site_id: str
@@ -169,8 +126,7 @@ class ProjectHistoryItem(BaseModel):
     submitted_by_name: Optional[str] = None
     design_status: str
     project_status: str = "pending"
-    current_stage: str = "budget"
-    budget_status: str = "draft"
+    current_stage: str = "execution"
     project_completed_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

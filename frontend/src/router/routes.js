@@ -45,6 +45,8 @@ export const ROUTES = {
   NSO_HISTORY_SITE:       '/nso/history/:siteId',
   NSO_PROCESS_FLOW:       '/nso/process-flow',
   NSO_PROCESS_FLOW_SITE:  '/nso/process-flow/:siteId',
+  PROJECT_EXCELLENCE:     '/project-excellence',
+  PROJECT_EXCELLENCE_SITE: '/project-excellence/:siteId',
   ADD_DETAILS:            '/shortlist/:code/details',
   LOI_TIMELINE:           '/shortlist/:code/timeline',
   SITE_TRACKER:           '/staging-flow',
@@ -110,6 +112,10 @@ export function nsoHistorySiteRoute(siteId) {
 
 export function nsoProcessFlowSiteRoute(siteId) {
   return ROUTES.NSO_PROCESS_FLOW_SITE.replace(':siteId', siteId);
+}
+
+export function projectExcellenceSiteRoute(siteId) {
+  return ROUTES.PROJECT_EXCELLENCE_SITE.replace(':siteId', siteId);
 }
 
 export function bdSiteStatusRoute(siteId) {

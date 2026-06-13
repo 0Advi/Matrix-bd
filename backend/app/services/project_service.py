@@ -1,38 +1,33 @@
 """Project Execution service.
 
 Opens after Design reaches GFC approval (`sites.design_status = 'approved'`).
-The module owns granular project state in `project_reviews` and
-`project_budget_items`; the parent `sites` row remains the cross-module ticket.
+The module owns execution milestones in `project_reviews`; budget tracking
+has moved to the Project Excellence module (202606134).
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status as http_status
-from sqlalchemy import delete, desc, or_, select
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import models
 from app.db.session import transaction
 from app.domain.schemas.common import OkResponse
 from app.domain.schemas.project import (
-    AdminBudgetReviewRequest,
     InitializationFinalizeRequest,
     InitializationRespondRequest,
     MidVisitRequest,
     MilestoneRequest,
-    ProjectBudgetAdminQueueResponse,
     ProjectHistoryItem,
     ProjectHistoryResponse,
-    ProjectBudgetItemOut,
     ProjectQueueItem,
     ProjectQueueResponse,
     ProjectStateResponse,
     ReviewRequest,
-    SaveBudgetRequest,
 )
 from app.services._common import fetch_site_or_404, fetch_user_name, fetch_user_names
 from app.services.audit_service import write_audit_event
@@ -40,27 +35,9 @@ from app.services.delegation_service import svc_assigned_sites, svc_is_delegated
 from app.services.storage_service import safe_object_name, signed_url, upload_bytes
 
 
-_BUDGET_LABELS = (
-    "Professional Fees",
-    "HVAC",
-    "Furniture, Light & Planters",
-    "Civil & Interiors",
-    "Kitchen Equipment",
-    "Branding",
-    "Crockery & Small Equipments",
-    "Utilities",
-    "Licencing",
-    "BD Cost",
-    "Misc",
-)
-
-
 def _is_supervisor(actor: dict) -> bool:
     return (actor.get("role") or "").lower() == "supervisor"
 
-
-def _is_business_admin(actor: dict) -> bool:
-    return (actor.get("role") or "").lower() == "business_admin"
 
 
 def _assert_project_unlocked(site: models.Site) -> None:
@@ -106,31 +83,11 @@ async def _fetch_review_or_create(
         tenant_id=site.tenant_id,
         site_id=site.id,
         project_status="pending",
-        current_stage="budget",
+        current_stage="execution",
     )
     session.add(review)
     await session.flush()
     return review
-
-
-async def _budget_items(
-    session: AsyncSession, *, site_id: str | UUID,
-) -> list[models.ProjectBudgetItem]:
-    rows = (await session.execute(
-        select(models.ProjectBudgetItem)
-        .where(models.ProjectBudgetItem.site_id == site_id)
-        .order_by(models.ProjectBudgetItem.idx.asc())
-    )).scalars().all()
-    return list(rows)
-
-
-def _budget_item_out(row: models.ProjectBudgetItem) -> ProjectBudgetItemOut:
-    return ProjectBudgetItemOut(
-        id=str(row.id),
-        idx=row.idx,
-        label=row.label,
-        amount=float(row.amount) if row.amount is not None else None,
-    )
 
 
 async def _queue_item(
@@ -152,18 +109,10 @@ async def _queue_item(
         city=site.city,
         design_status=site.design_status or "pending",
         project_status=(review.project_status if review else "pending"),
-        current_stage=(review.current_stage if review else "budget"),
-        budget_status=(review.budget_status if review else "draft"),
+        current_stage=(review.current_stage if review else "execution"),
         quality_audit_status=(review.quality_audit_status if review else "pending"),
         allocated_to_name=(delegate[1] if delegate else None),
         submitted_by_name=submitted_by_name,
-        budget_total=float(review.budget_total) if review and review.budget_total is not None else None,
-        total_indoor_area_sqft=(
-            float(review.total_indoor_area_sqft)
-            if review and review.total_indoor_area_sqft is not None else None
-        ),
-        total_area_sqft=float(review.total_area_sqft) if review and review.total_area_sqft is not None else None,
-        covers=int(review.covers) if review and review.covers is not None else None,
     )
 
 
@@ -231,7 +180,6 @@ async def _build_response(
     session: AsyncSession, site: models.Site, review: models.ProjectReview,
 ) -> ProjectStateResponse:
     delegate = await _active_project_delegate(session, site_id=site.id)
-    items = await _budget_items(session, site_id=site.id)
     return ProjectStateResponse(
         site_id=str(site.id),
         site_code=site.ca_code or site.code or "",
@@ -245,14 +193,6 @@ async def _build_response(
         current_stage=review.current_stage,
         allocated_to=str(review.allocated_to) if review.allocated_to else None,
         allocated_to_name=(delegate[1] if delegate else None),
-        budget_status=review.budget_status,
-        budget_total=float(review.budget_total) if review.budget_total is not None else None,
-        total_indoor_area_sqft=float(review.total_indoor_area_sqft) if review.total_indoor_area_sqft is not None else None,
-        total_area_sqft=float(review.total_area_sqft) if review.total_area_sqft is not None else None,
-        covers=int(review.covers) if review.covers is not None else None,
-        budget_items=[_budget_item_out(item) for item in items],
-        budget_supervisor_comments=review.budget_supervisor_comments,
-        budget_admin_comments=review.budget_admin_comments,
         initialization_date=review.initialization_date,
         initialization_status=review.initialization_status,
         initialization_comments=review.initialization_comments,
@@ -372,13 +312,11 @@ async def svc_project_history(
         stmt = stmt.where(
             or_(
                 models.ProjectReview.project_status.is_(None),
-                models.ProjectReview.project_status.in_(["pending", "allocated", "budgeting", "in_progress"]),
+                models.ProjectReview.project_status.in_(["pending", "allocated", "in_progress"]),
             )
         )
     elif status_filter in {"approved", "completed"}:
         stmt = stmt.where(models.ProjectReview.project_status == "done")
-    elif status_filter == "rejected":
-        stmt = stmt.where(models.ProjectReview.budget_status == "rejected")
 
     if restrict_to_site_ids is not None:
         stmt = stmt.where(models.Site.id.in_(restrict_to_site_ids))
@@ -402,8 +340,7 @@ async def svc_project_history(
             submitted_by_name=names.get(site.submitted_by),
             design_status=site.design_status or "pending",
             project_status=(review.project_status if review else "pending"),
-            current_stage=(review.current_stage if review else "budget"),
-            budget_status=(review.budget_status if review else "draft"),
+            current_stage=(review.current_stage if review else "execution"),
             project_completed_at=(review.project_completed_at if review else None),
             updated_at=(review.updated_at if review else site.updated_at),
         ))
@@ -440,32 +377,12 @@ async def svc_get_project_history_detail(
             tenant_id=site.tenant_id,
             site_id=site.id,
             project_status="pending",
-            current_stage="budget",
-            budget_status="draft",
+            current_stage="execution",
             initialization_status="pending",
             expected_completion_status="pending",
             quality_audit_status="pending",
         )
         review.updated_at = site.updated_at
-    return await _build_response(session, site, review)
-
-
-async def svc_get_project_budget_admin_detail(
-    session: AsyncSession, *, tenant_id: str | UUID, site_id: str | UUID,
-) -> ProjectStateResponse:
-    """Read-only project budget detail for Business Admin approval.
-
-    Business admins approve budget submissions, but they are not Project module
-    workers. This route gives them the same submitted budget context without
-    using the active Project detail route or mutating project state.
-    """
-    site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
-    review = await _fetch_review_or_none(session, site_id=site.id)
-    if review is None:
-        raise HTTPException(
-            status_code=http_status.HTTP_404_NOT_FOUND,
-            detail="Project budget details are not available for this site.",
-        )
     return await _build_response(session, site, review)
 
 
@@ -552,7 +469,7 @@ async def svc_allocate_project(
         review = await _fetch_review_or_create(session, site=site)
         review.allocated_to = delegate.id
         review.project_status = "allocated"
-        review.current_stage = "budget"
+        review.current_stage = "execution"
         site.project_status = "allocated"  # keep the sites mirror in sync (#134)
         await write_audit_event(
             session,
@@ -601,164 +518,6 @@ async def svc_revoke_project_delegation(
     return OkResponse(message="Project allocation revoked.")
 
 
-async def svc_save_budget(
-    session: AsyncSession,
-    *,
-    tenant_id: str | UUID,
-    actor: dict,
-    site_id: str | UUID,
-    body: SaveBudgetRequest,
-) -> ProjectStateResponse:
-    async with transaction(session):
-        site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
-        _assert_project_unlocked(site)
-        await _assert_can_work_project(session, tenant_id=tenant_id, actor=actor, site_id=site.id)
-        review = await _fetch_review_or_create(session, site=site)
-        if review.budget_status not in {"draft", "rejected"}:
-            raise HTTPException(
-                status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Budget is already {review.budget_status}.",
-            )
-
-        labels = {item.idx: (item.label or _BUDGET_LABELS[item.idx - 1]) for item in body.items}
-        amounts = {item.idx: item.amount for item in body.items}
-        await session.execute(delete(models.ProjectBudgetItem).where(models.ProjectBudgetItem.site_id == site.id))
-        total = 0.0
-        for idx in range(1, len(_BUDGET_LABELS) + 1):
-            amount = amounts.get(idx)
-            if amount is not None:
-                total += float(amount)
-            session.add(models.ProjectBudgetItem(
-                tenant_id=tenant_id,
-                site_id=site.id,
-                idx=idx,
-                label=labels.get(idx, _BUDGET_LABELS[idx - 1]),
-                amount=amount,
-            ))
-        review.budget_total = total
-        review.total_indoor_area_sqft = body.total_indoor_area_sqft
-        review.total_area_sqft = body.total_area_sqft
-        review.covers = body.covers
-        review.project_status = "budgeting"
-        review.current_stage = "budget"
-        site.project_status = "budgeting"  # keep the sites mirror in sync (#134)
-        if body.action == "submit":
-            review.budget_status = "pending_admin" if _is_supervisor(actor) else "pending_supervisor"
-        else:
-            review.budget_status = "draft"
-        await write_audit_event(
-            session,
-            tenant_id=tenant_id,
-            site_id=site.id,
-            actor_id=actor["sub"],
-            actor_name=actor.get("name"),
-            action="project_budget_saved" if body.action == "save" else "project_budget_submitted",
-            detail=f"total={total} status={review.budget_status}",
-        )
-        await session.flush()
-        return await _build_response(session, site, review)
-
-
-async def svc_review_budget(
-    session: AsyncSession,
-    *,
-    tenant_id: str | UUID,
-    actor: dict,
-    site_id: str | UUID,
-    body: ReviewRequest,
-) -> ProjectStateResponse:
-    if not _is_supervisor(actor):
-        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Only a project supervisor can review budgets.")
-    async with transaction(session):
-        site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
-        review = await _fetch_review_or_create(session, site=site)
-        if review.budget_status != "pending_supervisor":
-            raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Budget is not awaiting supervisor.")
-        if body.decision == "approve":
-            review.budget_status = "pending_admin"
-        else:
-            review.budget_status = "rejected"
-            review.budget_supervisor_comments = (body.comments or "").strip() or "Rejected by project supervisor."
-        await write_audit_event(
-            session,
-            tenant_id=tenant_id,
-            site_id=site.id,
-            actor_id=actor["sub"],
-            actor_name=actor.get("name"),
-            action="project_budget_supervisor_reviewed",
-            detail=f"decision={body.decision}",
-        )
-        return await _build_response(session, site, review)
-
-
-async def svc_budget_admin_queue(
-    session: AsyncSession, *, tenant_id: str | UUID,
-) -> ProjectBudgetAdminQueueResponse:
-    # NOTE: no blanket `except SQLAlchemyError → empty list` here. Swallowing
-    # DB errors rendered an empty queue in the UI and masked schema↔code
-    # drift; let the dependency roll back and FastAPI surface the 500.
-    rows = (await session.execute(
-        select(models.Site, models.ProjectReview)
-        .join(models.ProjectReview, models.ProjectReview.site_id == models.Site.id)
-        .where(
-            models.Site.tenant_id == tenant_id,
-            models.ProjectReview.budget_status == "pending_admin",
-        )
-        .order_by(models.ProjectReview.updated_at.asc())
-    )).all()
-    # Batch the delegate/name lookups (2 queries total) instead of 2 per site —
-    # the same N+1 svc_project_queue already avoids (#81).
-    delegates, names = await _batch_project_prefetch(session, [site for site, _r in rows])
-    items = [
-        await _queue_item(session, site, review, prefetched={
-            "delegate": delegates.get(site.id),
-            "submitted_by_name": names.get(site.submitted_by, ""),
-        })
-        for (site, review) in rows
-    ]
-    return ProjectBudgetAdminQueueResponse(items=items, total=len(items))
-
-
-async def svc_admin_review_budget(
-    session: AsyncSession,
-    *,
-    tenant_id: str | UUID,
-    actor: dict,
-    site_id: str | UUID,
-    body: AdminBudgetReviewRequest,
-) -> ProjectStateResponse:
-    if not _is_business_admin(actor):
-        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Only a business admin can review project budgets.")
-    async with transaction(session):
-        site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
-        review = await _fetch_review_or_create(session, site=site)
-        if review.budget_status != "pending_admin":
-            raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Budget is not awaiting admin.")
-        if body.decision == "approve":
-            review.budget_status = "approved"
-            review.project_status = "in_progress"
-            review.current_stage = "execution"
-            site.project_status = "in_progress"  # keep the sites mirror in sync (#134)
-            # The admin sets the project initialization date here (UI defaults
-            # it to today + 2 days). It then goes to the executive to accept/
-            # reject, so the status becomes 'proposed'.
-            review.initialization_date = body.initialization_date or (date.today() + timedelta(days=2))
-            review.initialization_status = "proposed"
-        else:
-            review.budget_status = "rejected"
-            review.budget_admin_comments = (body.comments or "").strip() or "Rejected by business admin."
-        await write_audit_event(
-            session,
-            tenant_id=tenant_id,
-            site_id=site.id,
-            actor_id=actor["sub"],
-            actor_name=actor.get("name"),
-            action="project_budget_admin_reviewed",
-            detail=f"decision={body.decision}",
-        )
-        return await _build_response(session, site, review)
-
-
 async def svc_submit_milestone(
     session: AsyncSession,
     *,
@@ -772,8 +531,10 @@ async def svc_submit_milestone(
         site = await fetch_site_or_404(session, site_id=site_id, tenant_id=tenant_id)
         await _assert_can_work_project(session, tenant_id=tenant_id, actor=actor, site_id=site.id)
         review = await _fetch_review_or_create(session, site=site)
-        if review.budget_status != "approved":
-            raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Execution is locked until budget approval.")
+        if review.project_status not in {"allocated", "in_progress"}:
+            raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Site must be allocated before setting milestones.")
+        review.project_status = "in_progress"
+        site.project_status = "in_progress"  # keep mirror in sync (#134)
         if field == "expected_completion_date":
             # Only available once the initialization date is finalized.
             if review.initialization_status != "approved":

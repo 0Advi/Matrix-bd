@@ -142,6 +142,8 @@ class Site(Base):
     # matching the legal/design/finance mirror contract BD/BI read. (#134)
     project_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
     project_completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # Project Excellence module mirror — written by project_excellence_service.
+    project_excellence_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
 
     # Finance / CA code flow (managed from the Site Tracker Finance tab).
     # Once ca_code is set it replaces site.code as the display identifier.
@@ -371,7 +373,7 @@ class SiteDelegation(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
     __table_args__ = (
-        CheckConstraint("module IN ('bd','legal','design','project','nso')", name="chk_site_delegations_module"),  # 'payment' retired (202606132)
+        CheckConstraint("module IN ('bd','legal','design','project','nso','project_excellence')", name="chk_site_delegations_module"),  # 'payment' retired (202606132); 'project_excellence' added (202606134)
     )
 
 
@@ -680,17 +682,8 @@ class ProjectReview(Base):
         UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False,
     )
     project_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
-    current_stage: Mapped[str] = mapped_column(Text, nullable=False, server_default="budget")
+    current_stage: Mapped[str] = mapped_column(Text, nullable=False, server_default="execution")
     allocated_to: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
-
-    budget_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
-    budget_total: Mapped[Optional[float]] = mapped_column(Numeric(14, 2))
-    # Captured alongside the budget; feed the per-sqft / per-cover metrics.
-    total_indoor_area_sqft: Mapped[Optional[float]] = mapped_column(Numeric(12, 2))
-    total_area_sqft: Mapped[Optional[float]] = mapped_column(Numeric(12, 2))
-    covers: Mapped[Optional[int]] = mapped_column(Integer)
-    budget_supervisor_comments: Mapped[Optional[str]] = mapped_column(Text)
-    budget_admin_comments: Mapped[Optional[str]] = mapped_column(Text)
 
     initialization_date: Mapped[Optional[date]] = mapped_column(Date)
     initialization_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
@@ -717,16 +710,12 @@ class ProjectReview(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "project_status IN ('pending','allocated','budgeting','in_progress','done')",
+            "project_status IN ('pending','allocated','in_progress','done')",
             name="chk_project_status",
         ),
         CheckConstraint(
-            "current_stage IN ('budget','execution','done')",
+            "current_stage IN ('execution','done')",
             name="chk_project_current_stage",
-        ),
-        CheckConstraint(
-            "budget_status IN ('draft','pending_supervisor','pending_admin','approved','rejected')",
-            name="chk_project_budget_status",
         ),
         CheckConstraint(
             "initialization_status IN ('pending','proposed','submitted','approved','rejected')",
@@ -745,13 +734,63 @@ class ProjectReview(Base):
             name="chk_project_quality_status",
         ),
         Index("idx_project_reviews_tenant_status", "tenant_id", "project_status"),
-        Index("idx_project_reviews_budget_status", "tenant_id", "budget_status"),
     )
 
 
-class ProjectBudgetItem(Base):
-    """Budget line items for a project review."""
-    __tablename__ = "project_budget_items"
+
+# ── Project Excellence workflow ───────────────────────────────────────────────
+# Opens after the Project module marks project_status='done'.
+# Owns the 11-item budget review flow that was moved out of project_reviews.
+
+class ProjectExcellenceReview(Base):
+    """One row per site for the Project Excellence module."""
+    __tablename__ = "project_excellence_reviews"
+    __mapper_args__ = {"eager_defaults": True}
+
+    site_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sites.id", ondelete="CASCADE"), primary_key=True,
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False,
+    )
+    excellence_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    current_stage: Mapped[str] = mapped_column(Text, nullable=False, server_default="budget")
+    allocated_to: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+
+    budget_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    budget_total: Mapped[Optional[float]] = mapped_column(Numeric(14, 2))
+    total_indoor_area_sqft: Mapped[Optional[float]] = mapped_column(Numeric(12, 2))
+    total_area_sqft: Mapped[Optional[float]] = mapped_column(Numeric(12, 2))
+    covers: Mapped[Optional[int]] = mapped_column(Integer)
+    budget_supervisor_comments: Mapped[Optional[str]] = mapped_column(Text)
+    budget_admin_comments: Mapped[Optional[str]] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False,
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "excellence_status IN ('pending','allocated','budgeting','approved','done')",
+            name="chk_pe_excellence_status",
+        ),
+        CheckConstraint(
+            "current_stage IN ('budget','done')",
+            name="chk_pe_current_stage",
+        ),
+        CheckConstraint(
+            "budget_status IN ('draft','pending_supervisor','pending_admin','approved','rejected')",
+            name="chk_pe_budget_status",
+        ),
+        Index("idx_pe_reviews_tenant_status", "tenant_id", "excellence_status"),
+        Index("idx_pe_reviews_budget_status", "tenant_id", "budget_status"),
+    )
+
+
+class ProjectExcellenceItem(Base):
+    """Budget line items for a project excellence review (11 items, moved from project_budget_items)."""
+    __tablename__ = "project_excellence_items"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
@@ -765,9 +804,9 @@ class ProjectBudgetItem(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("site_id", "idx", name="uq_project_budget_site_idx"),
-        CheckConstraint("idx BETWEEN 1 AND 11", name="chk_project_budget_idx"),
-        Index("idx_project_budget_items_site", "site_id"),
+        UniqueConstraint("site_id", "idx", name="uq_pe_item_site_idx"),
+        CheckConstraint("idx BETWEEN 1 AND 11", name="chk_pe_item_idx"),
+        Index("idx_pe_items_site", "site_id"),
     )
 
 
