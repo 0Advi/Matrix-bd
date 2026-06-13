@@ -7,10 +7,15 @@
 //   3. Surface server errors as a typed `ApiError` so SitesContext / UI can
 //      render meaningful messages instead of axios "Network Error".
 //   4. Time out hung requests so the UI never spins forever.
-//   5. Treat 401 as a session-expired signal (clears the local token).
+//   5. Refresh near-expiry tokens and preserve form state on hard expiry.
 
 import axios from 'axios';
-import { clearAuthToken, getAuthToken } from '../authToken.js';
+import {
+  getAuthToken,
+  isAuthTokenExpiringSoon,
+  notifySessionExpired,
+  setAuthToken,
+} from '../authToken.js';
 import { notifySiteDataChanged } from '../siteEvents.js';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api';
@@ -23,9 +28,44 @@ const TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS ?? 20000);
 const UPLOAD_TIMEOUT_MS = Number(import.meta.env.VITE_API_UPLOAD_TIMEOUT_MS ?? 120000);
 
 const client = axios.create({ baseURL: BASE_URL, timeout: TIMEOUT_MS });
+let refreshPromise = null;
 
-client.interceptors.request.use(cfg => {
+async function refreshBearerToken() {
   const token = getAuthToken();
+  if (!token) return null;
+  if (!refreshPromise) {
+    refreshPromise = axios.post(
+      `${BASE_URL}/auth/refresh`,
+      {},
+      {
+        timeout: TIMEOUT_MS,
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    )
+      .then((response) => {
+        const next = response.data?.access_token;
+        if (next) setAuthToken(next);
+        return next || null;
+      })
+      .finally(() => { refreshPromise = null; });
+  }
+  return refreshPromise;
+}
+
+export async function ensureFreshAuthToken() {
+  let token = getAuthToken();
+  if (token && isAuthTokenExpiringSoon(token)) {
+    try {
+      token = await refreshBearerToken() || getAuthToken();
+    } catch (err) {
+      notifySessionExpired({ reason: 'refresh_failed', error: err });
+    }
+  }
+  return token;
+}
+
+client.interceptors.request.use(async cfg => {
+  const token = await ensureFreshAuthToken();
   if (token) cfg.headers.Authorization = `Bearer ${token}`;
   return cfg;
 });
@@ -45,7 +85,7 @@ export class ApiError extends Error {
 
 client.interceptors.response.use(
   r => r,
-  err => {
+  async err => {
     if (err.code === 'ECONNABORTED') {
       throw new ApiError({ status: 0, code: 'TIMEOUT', detail: 'Request timed out', cause: err });
     }
@@ -59,8 +99,28 @@ client.interceptors.response.use(
     const detail = status === 0 && parsedDetail === 'Network Error'
       ? `Network Error contacting API at ${BASE_URL}. Check backend deployment, CORS, and database migration status.`
       : parsedDetail;
-    // Session expiry — drop the local token so the UI can route to login.
-    if (status === 401) clearAuthToken();
+
+    if (status === 401 && !err.config?._retriedAfterRefresh) {
+      try {
+        const token = await refreshBearerToken();
+        if (token) {
+          const retryConfig = {
+            ...err.config,
+            _retriedAfterRefresh: true,
+            headers: {
+              ...(err.config?.headers || {}),
+              Authorization: `Bearer ${token}`,
+            },
+          };
+          return client.request(retryConfig);
+        }
+      } catch (refreshErr) {
+        notifySessionExpired({ reason: 'unauthorized', error: refreshErr });
+      }
+    }
+    if (status === 401) {
+      notifySessionExpired({ reason: 'unauthorized', detail });
+    }
     throw new ApiError({ status, detail, code: err.response?.data?.code, cause: err });
   },
 );

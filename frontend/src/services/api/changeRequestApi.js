@@ -11,8 +11,8 @@
 //   POST /legal/change-requests/{id}/reject     (Legal supervisor rejects)
 
 import axios from 'axios';
-import { getAuthToken, clearAuthToken } from './authToken.js';
-import { ApiError } from './adapters/httpAdapter.js';
+import { getAuthToken, notifySessionExpired } from './authToken.js';
+import { ApiError, ensureFreshAuthToken } from './adapters/httpAdapter.js';
 import { notifySiteDataChanged } from './siteEvents.js';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api';
@@ -20,8 +20,8 @@ const TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS ?? 20000);
 
 const client = axios.create({ baseURL: BASE_URL, timeout: TIMEOUT_MS });
 
-client.interceptors.request.use((cfg) => {
-  const token = getAuthToken();
+client.interceptors.request.use(async (cfg) => {
+  const token = await ensureFreshAuthToken() || getAuthToken();
   if (token) cfg.headers.Authorization = `Bearer ${token}`;
   return cfg;
 });
@@ -34,7 +34,7 @@ client.interceptors.response.use(
     }
     const status = err.response?.status ?? 0;
     const detail = err.response?.data?.detail || err.message || 'Request failed';
-    if (status === 401) clearAuthToken();
+    if (status === 401) notifySessionExpired({ reason: 'unauthorized', detail });
     throw new ApiError({ status, detail, code: err.response?.data?.code, cause: err });
   },
 );

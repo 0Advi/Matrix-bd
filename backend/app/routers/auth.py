@@ -535,6 +535,71 @@ async def whoami(current_user: CurrentUser) -> dict:
 
 
 @router.post(
+    "/refresh",
+    response_model=LoginOut,
+    summary="Refresh the current JWT before it expires",
+)
+async def refresh(current_user: CurrentUser, db: DbDep) -> LoginOut:
+    """Mint a fresh JWT from the still-valid current session.
+
+    The current_user dependency already verifies the bearer token and reloads
+    the user's active role from the database. This endpoint then rebuilds the
+    token from live tenant/module data so frontend forms can refresh quietly
+    before expiry without losing in-progress edits.
+    """
+    row = (await db.execute(
+        text("""
+            SELECT u.id, u.email, u.name, u.role, u.assigned_city,
+                   t.id AS tenant_id, t.name AS tenant_name
+              FROM users u
+              JOIN tenants t ON t.id = u.tenant_id
+             WHERE u.id = :uid AND u.is_active = true
+        """),
+        {"uid": current_user["sub"]},
+    )).mappings().first()
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account is inactive or no longer exists. Sign in again.",
+        )
+
+    membership = (await db.execute(
+        text("""
+            SELECT module, role_in_module, supervisor_id
+              FROM user_module_memberships
+             WHERE user_id = :uid
+             ORDER BY module
+             LIMIT 1
+        """),
+        {"uid": row["id"]},
+    )).mappings().first() or {}
+    supervisor_id = membership.get("supervisor_id")
+    token = issue_token(
+        sub=str(row["id"]),
+        email=row["email"],
+        name=row["name"] or row["email"].split("@")[0],
+        role=row["role"],
+        tenant_id=str(row["tenant_id"]),
+        city=row["assigned_city"],
+        module=membership.get("module"),
+        module_role=membership.get("role_in_module"),
+        supervisor_id=str(supervisor_id) if supervisor_id else None,
+    )
+    return LoginOut(
+        access_token=token,
+        user={
+            "id":          str(row["id"]),
+            "email":       row["email"],
+            "name":        row["name"],
+            "role":        row["role"],
+            "tenant_id":   str(row["tenant_id"]),
+            "tenant_name": row["tenant_name"],
+            "city":        row["assigned_city"],
+        },
+    )
+
+
+@router.post(
     "/logout",
     response_model=OkResponse,
     summary="Courtesy logout (clients must also drop their bearer token)",

@@ -2,7 +2,13 @@ import React, { createContext, useContext, useState, useEffect, useMemo } from '
 import { DEFAULT_SESSION, me as fetchMe, logout as logoutApi } from '../services/api/authService.js';
 import { can, PERMISSIONS } from '../rbac/permissions.js';
 import { ROLE } from '../rbac/roles.js';
-import { subscribeAuthToken, getAuthToken, clearAuthToken } from '../services/api/authToken.js';
+import {
+  SESSION_EXPIRED_EVENT,
+  subscribeAuthToken,
+  getAuthToken,
+  clearAuthToken,
+  notifySessionExpired,
+} from '../services/api/authToken.js';
 import { signOut as supabaseSignOut } from '../services/api/supabaseAuth.js';
 
 // SessionContext — holds the current user session and role.
@@ -38,6 +44,7 @@ export function SessionProvider({ children }) {
   // ('supervisor'), or a non-supervisor token triggers a transient 403/401.
   // Mock mode is ready immediately — the session is the static default.
   const [authReady, setAuthReady] = useState(USE_MOCK);
+  const [sessionExpired, setSessionExpired] = useState(null);
   // Hydrate dark from localStorage so the choice survives refresh and any
   // provider re-mount (e.g. StrictMode double-invoke, route-driven unmount).
   const [dark, setDark] = useState(() => {
@@ -63,6 +70,15 @@ export function SessionProvider({ children }) {
     document.body.dataset.theme = dark ? 'dark' : 'light';
     try { window.localStorage.setItem('zm:dark', dark ? '1' : '0'); } catch { /* storage disabled */ }
   }, [dark]);
+
+  useEffect(() => {
+    if (USE_MOCK || typeof window === 'undefined') return undefined;
+    const onExpired = (event) => {
+      setSessionExpired(event?.detail || { reason: 'expired' });
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, []);
 
   // In HTTP mode, hydrate session from /auth/whoami whenever a token appears
   // (sign-in or token refresh) and reset to defaults when it clears.
@@ -90,12 +106,15 @@ export function SessionProvider({ children }) {
           // licensing CTA is unlocked for this user.
           userId:    claims.sub || INITIAL_SESSION.userId || null,
         });
+        setSessionExpired(null);
       } catch (err) {
         if (isAuthRejection(err)) {
-          // Stale token / missing app_metadata — clear so the UI routes to login.
+          // Stale token / missing app_metadata. Keep the token and mounted
+          // route until the user chooses to sign in again so in-progress forms
+          // are not wiped by an automatic redirect. (#130)
           // eslint-disable-next-line no-console
-          console.warn('[session] /auth/whoami unauthorized — clearing token', err);
-          clearAuthToken();
+          console.warn('[session] /auth/whoami unauthorized — preserving route', err);
+          notifySessionExpired({ reason: 'whoami_unauthorized', error: err });
         } else {
           // Transient (timeout / network / 5xx). Keep the token so the user
           // isn't logged out by a slow backend; a refresh re-hydrates. (#128)
@@ -118,6 +137,13 @@ export function SessionProvider({ children }) {
     try { await logoutApi(); } catch { /* best-effort */ }
     try { await supabaseSignOut(); } catch { /* best-effort */ }
     clearAuthToken();
+    setSessionExpired(null);
+    setSession(INITIAL_SESSION);
+  };
+
+  const signInAgain = () => {
+    clearAuthToken();
+    setSessionExpired(null);
     setSession(INITIAL_SESSION);
   };
 
@@ -155,11 +181,66 @@ export function SessionProvider({ children }) {
     can: (action) => can(role, action),
     isMockMode: USE_MOCK,
     signOut,
+    sessionExpired,
   };
 
   return (
     <SessionContext.Provider value={value}>
       {children}
+      {sessionExpired && !USE_MOCK && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="session-expired-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'grid',
+            placeItems: 'center',
+            background: 'rgba(7, 12, 10, 0.45)',
+            padding: 24,
+          }}
+        >
+          <div
+            style={{
+              width: 'min(440px, calc(100vw - 32px))',
+              borderRadius: 18,
+              border: '1px solid rgba(24, 84, 75, 0.22)',
+              background: '#fffaf1',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.22)',
+              padding: 24,
+              color: '#181a20',
+            }}
+          >
+            <p style={{ margin: '0 0 8px', color: '#0f6b5f', fontSize: 12, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase' }}>
+              Session paused
+            </p>
+            <h2 id="session-expired-title" style={{ margin: 0, fontSize: 28, lineHeight: 1.05 }}>
+              Sign in again to continue
+            </h2>
+            <p style={{ margin: '14px 0 22px', color: '#5f626d', lineHeight: 1.45 }}>
+              Your workspace session expired. This page is still open so your in-progress form stays visible.
+            </p>
+            <button
+              type="button"
+              onClick={signInAgain}
+              style={{
+                width: '100%',
+                minHeight: 48,
+                border: 0,
+                borderRadius: 14,
+                background: '#0f6b5f',
+                color: '#fff',
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              Go to sign in
+            </button>
+          </div>
+        </div>
+      )}
     </SessionContext.Provider>
   );
 }
