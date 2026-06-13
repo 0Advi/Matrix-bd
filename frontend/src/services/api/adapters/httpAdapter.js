@@ -40,6 +40,17 @@ function isBootstrapAuthRequest(config) {
   return url.endsWith('/auth/whoami') || url.endsWith('/auth/refresh');
 }
 
+// A 401 only means "your SESSION expired" if a token was actually attached. A
+// request that carried NO Authorization header (e.g. the global sites poll
+// firing before the user has logged in) is simply unauthenticated — surfacing
+// the "session paused" modal for it is wrong and pops the modal on the authed
+// route right after login. The request interceptor only sets Authorization when
+// a token exists, so its absence means "not logged in". (popup-on-login fix)
+function requestCarriedToken(config) {
+  const h = config?.headers || {};
+  return Boolean(h.Authorization || h.authorization);
+}
+
 async function refreshBearerToken() {
   const token = getAuthToken();
   if (!token) return null;
@@ -116,7 +127,11 @@ client.interceptors.response.use(
       ? `Network Error contacting API at ${BASE_URL}. Check backend deployment, CORS, and database migration status.`
       : parsedDetail;
 
-    if (status === 401 && !err.config?._retriedAfterRefresh) {
+    // Only try to refresh + surface a "session expired" prompt when the failing
+    // request actually carried a token. A tokenless 401 = not signed in (no
+    // session to refresh or expire); just surface the ApiError to the caller.
+    const tokenWasSent = requestCarriedToken(err.config);
+    if (status === 401 && tokenWasSent && !err.config?._retriedAfterRefresh) {
       try {
         const token = await refreshBearerToken();
         if (token) {
@@ -136,7 +151,7 @@ client.interceptors.response.use(
         }
       }
     }
-    if (status === 401 && !isBootstrapAuthRequest(err.config)) {
+    if (status === 401 && tokenWasSent && !isBootstrapAuthRequest(err.config)) {
       notifySessionExpired({ reason: 'unauthorized', detail });
     }
     throw new ApiError({ status, detail, code: err.response?.data?.code, cause: err });

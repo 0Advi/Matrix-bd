@@ -2,7 +2,20 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { SiteStatus, legacyStageFor } from '../lib/stateMachine.js';
 import * as siteService from '../services/api/siteService.js';
 import { useSession } from './SessionContext.jsx';
+import { getAuthToken } from '../services/api/authToken.js';
 import { notifySiteDataChanged, subscribeSiteDataChanged } from '../services/api/siteEvents.js';
+
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true' || import.meta.env.VITE_USE_MOCK === true;
+
+// In HTTP mode the store must stay idle until the user is signed in. The
+// provider wraps the WHOLE app (including the public landing), so firing
+// /api/sites on mount / on the 30s poll / on window-focus while logged out
+// produced tokenless 401s — which the HTTP adapter then surfaced as the
+// "session paused" modal right after login (the early /sites 401s resolve on an
+// authed route). Gate every fetch on having a token. (popup-on-login fix)
+function _isAuthed() {
+  return USE_MOCK || Boolean(getAuthToken());
+}
 
 // ============================================================
 // SitesContext — unified site store.
@@ -145,6 +158,14 @@ export function SitesProvider({ children }) {
   const identityKey = session?.userId || session?.id || session?.email || '';
   useEffect(() => {
     let alive = true;
+    // Logged out → don't issue a tokenless /api/sites request (it 401s and would
+    // pop the session-expired modal). Reset to a clean empty state instead.
+    if (!_isAuthed()) {
+      setSites([]);
+      setError(null);
+      setLoading(false);
+      return () => { alive = false; };
+    }
     setLoading(true);
     siteService.listSites()
       .then(data => { if (alive) { setSites(data); setLoading(false); } })
@@ -172,7 +193,9 @@ export function SitesProvider({ children }) {
   }, [refresh]);
 
   useEffect(() => {
-    const run = () => refresh().catch(err => setError(err.message));
+    // Never poll while signed out — a tokenless refresh 401s and re-pops the
+    // session modal. (popup-on-login fix)
+    const run = () => { if (_isAuthed()) refresh().catch(err => setError(err.message)); };
     const unsubscribe = subscribeSiteDataChanged((detail) => {
       if (detail?.source !== 'SitesContext') run();
     });
