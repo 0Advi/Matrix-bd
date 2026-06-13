@@ -286,10 +286,13 @@ function FinancePanel({ data, role, onClose, onUpdate }) {
     setAmount(data.financeAmount != null ? String(data.financeAmount) : '');
   }, [data.kycVerified, data.caCode, data.financeAmount, data.financeStatus]);
 
+  const toastTimer = React.useRef(null);
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3500);
   };
+  React.useEffect(() => () => clearTimeout(toastTimer.current), []);
 
   // ── Save draft ────────────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -666,14 +669,19 @@ export default function SiteTrackerDetailPage() {
     if (!siteId) return;
     if (!silent) setState((s) => ({ ...s, status: 'loading' }));
     getSiteTrackerView(siteId)
-      .then((data) => setState({ status: 'ready', data, error: null }))
-      .catch((err) => setState({
+      .then((data) => { if (!cancelledRef.current) setState({ status: 'ready', data, error: null }); })
+      .catch((err) => { if (!cancelledRef.current) setState({
         status: 'error', data: null,
         error: err?.detail || err?.message || 'Failed to load site flow',
-      }));
+      }); });
   }, [siteId]);
 
-  React.useEffect(() => { load(); }, [load]);
+  const cancelledRef = React.useRef(false);
+  React.useEffect(() => {
+    cancelledRef.current = false;
+    load();
+    return () => { cancelledRef.current = true; };
+  }, [load]);
   useSiteDataRefresh(React.useCallback(() => load(true), [load]), { siteId });
   React.useEffect(() => {
     // Legal is its own full page now; if a stale ?node=legal link arrives,
