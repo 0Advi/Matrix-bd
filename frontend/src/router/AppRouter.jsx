@@ -52,6 +52,8 @@ const ApprovalCenterPreview = import.meta.env.DEV
 import ProjectReviewPage        from '../modules/project/ProjectReviewPage.jsx';
 import NsoQueuePage             from '../modules/nso/NsoQueuePage.jsx';
 import NsoReviewPage            from '../modules/nso/NsoReviewPage.jsx';
+import ProjectExcellenceQueuePage  from '../modules/project_excellence/ProjectExcellenceQueuePage.jsx';
+import ProjectExcellenceReviewPage from '../modules/project_excellence/ProjectExcellenceReviewPage.jsx';
 
 // In HTTP (non-mock) mode the landing page is the unauthenticated entry. The
 // existing app chrome only renders after a Supabase session is established.
@@ -63,7 +65,8 @@ function homeForRoleModule(role, module) {
   if (module === 'legal')        return ROUTES.LEGAL;
   if (module === 'design')       return ROUTES.DESIGN;
   if (module === 'project')      return ROUTES.PROJECT;
-  if (module === 'nso')          return ROUTES.NSO;
+  if (module === 'nso')               return ROUTES.NSO;
+  if (module === 'project_excellence') return ROUTES.PROJECT_EXCELLENCE;
   return ROUTES.OVERVIEW; // BD / unknown → default to BD overview
 }
 
@@ -113,7 +116,8 @@ function IndexRedirect() {
   if (module === 'legal')   return <Navigate to={ROUTES.LEGAL}   replace/>;
   if (module === 'design')  return <Navigate to={ROUTES.DESIGN}  replace/>;
   if (module === 'project') return <Navigate to={ROUTES.PROJECT} replace/>;
-  if (module === 'nso')     return <Navigate to={ROUTES.NSO}     replace/>;
+  if (module === 'nso')               return <Navigate to={ROUTES.NSO}               replace/>;
+  if (module === 'project_excellence') return <Navigate to={ROUTES.PROJECT_EXCELLENCE} replace/>;
   return <OverviewPage/>;
 }
 
@@ -423,6 +427,22 @@ export default function AppRouter() {
           </RequireRole>
         }/>
         <Route path="/nso/*" element={<Navigate to={ROUTES.NSO} replace/>}/>
+
+        <Route path={ROUTES.PROJECT_EXCELLENCE} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['project_excellence']}>
+              <ProjectExcellenceQueuePage/>
+            </RequireModule>
+          </RequireRole>
+        }/>
+        <Route path={ROUTES.PROJECT_EXCELLENCE_SITE} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['project_excellence']}>
+              <ProjectExcellenceReviewPage/>
+            </RequireModule>
+          </RequireRole>
+        }/>
+        <Route path="/project-excellence/*" element={<Navigate to={ROUTES.PROJECT_EXCELLENCE} replace/>}/>
 
         <Route path={ROUTES.DD_FAILED} element={
           <RequireRole roles={['supervisor', 'executive', 'exec']}>

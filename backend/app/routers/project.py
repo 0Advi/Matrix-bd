@@ -10,41 +10,33 @@ from app.core.deps import DbDep, TenantId
 from app.core.uploads import read_upload_capped
 from app.domain.schemas.common import OkResponse
 from app.domain.schemas.project import (
-    AdminBudgetReviewRequest,
     AllocateProjectRequest,
     InitializationFinalizeRequest,
     InitializationRespondRequest,
     MidVisitRequest,
     MilestoneRequest,
-    ProjectBudgetAdminQueueResponse,
     ProjectDelegationsResponse,
     ProjectHistoryResponse,
     ProjectQueueResponse,
     ProjectStateResponse,
     ReviewRequest,
-    SaveBudgetRequest,
 )
 from app.rbac.guards import require_module, require_role
 from app.rbac.roles import Role
 from app.services.delegation_service import svc_assigned_sites, svc_is_delegated
 from app.services.project_service import (
-    svc_admin_review_budget,
     svc_allocate_project,
-    svc_budget_admin_queue,
     svc_finalize_initialization,
     svc_get_project,
-    svc_get_project_budget_admin_detail,
     svc_get_project_history_detail,
     svc_list_project_delegations_for_site,
     svc_nso_queue,
     svc_project_queue,
     svc_project_history,
     svc_respond_initialization,
-    svc_review_budget,
     svc_review_milestone,
     svc_review_quality_audit,
     svc_revoke_project_delegation,
-    svc_save_budget,
     svc_set_mid_visit,
     svc_submit_milestone,
     svc_submit_quality_audit_report,
@@ -55,7 +47,6 @@ router = APIRouter(prefix="/project", tags=["Project"])
 ProjectMember = Annotated[dict, Depends(require_role(Role.SUPERVISOR, Role.EXECUTIVE))]
 ProjectSupervisor = Annotated[dict, Depends(require_role(Role.SUPERVISOR))]
 InProjectModule = Annotated[dict, Depends(require_module("project"))]
-BusinessAdmin = Annotated[dict, Depends(require_role(Role.BUSINESS_ADMIN))]
 
 
 def _is_executive(user: dict) -> bool:
@@ -116,38 +107,6 @@ async def project_history_detail(
                 detail="This site is not allocated to you.",
             )
     return await svc_get_project_history_detail(db, tenant_id=tenant_id, site_id=site_id)
-
-
-@router.get("/budget-admin-queue", response_model=ProjectBudgetAdminQueueResponse)
-async def project_budget_admin_queue(
-    db: DbDep,
-    current_user: BusinessAdmin,
-    tenant_id: TenantId,
-) -> ProjectBudgetAdminQueueResponse:
-    return await svc_budget_admin_queue(db, tenant_id=tenant_id)
-
-
-@router.get("/budget-admin-detail/{site_id}", response_model=ProjectStateResponse)
-async def project_budget_admin_detail(
-    site_id: str,
-    db: DbDep,
-    current_user: BusinessAdmin,
-    tenant_id: TenantId,
-) -> ProjectStateResponse:
-    return await svc_get_project_budget_admin_detail(db, tenant_id=tenant_id, site_id=site_id)
-
-
-@router.post("/{site_id}/budget/admin-review", response_model=ProjectStateResponse)
-async def project_budget_admin_review(
-    site_id: str,
-    body: AdminBudgetReviewRequest,
-    db: DbDep,
-    current_user: BusinessAdmin,
-    tenant_id: TenantId,
-) -> ProjectStateResponse:
-    return await svc_admin_review_budget(
-        db, tenant_id=tenant_id, actor=current_user, site_id=site_id, body=body,
-    )
 
 
 @router.get("/nso-queue", response_model=ProjectQueueResponse)
@@ -218,30 +177,6 @@ async def revoke_project_allocation(
         site_id=site_id,
         delegate_user_id=user_id,
     )
-
-
-@router.post("/{site_id}/budget", response_model=ProjectStateResponse)
-async def save_project_budget(
-    site_id: str,
-    body: SaveBudgetRequest,
-    db: DbDep,
-    current_user: ProjectMember,
-    _module: InProjectModule,
-    tenant_id: TenantId,
-) -> ProjectStateResponse:
-    return await svc_save_budget(db, tenant_id=tenant_id, actor=current_user, site_id=site_id, body=body)
-
-
-@router.post("/{site_id}/budget/review", response_model=ProjectStateResponse)
-async def review_project_budget(
-    site_id: str,
-    body: ReviewRequest,
-    db: DbDep,
-    current_user: ProjectSupervisor,
-    _module: InProjectModule,
-    tenant_id: TenantId,
-) -> ProjectStateResponse:
-    return await svc_review_budget(db, tenant_id=tenant_id, actor=current_user, site_id=site_id, body=body)
 
 
 @router.post("/{site_id}/milestone/{field}", response_model=ProjectStateResponse)
