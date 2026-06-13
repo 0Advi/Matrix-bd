@@ -13,6 +13,7 @@
 // the `storage` event.
 
 const STORAGE_KEY = 'matrix.access_token';
+export const SESSION_EXPIRED_EVENT = 'scale:session-expired';
 
 let _token = null;
 const _listeners = new Set();
@@ -56,4 +57,37 @@ export function clearAuthToken() { setAuthToken(null); }
 export function subscribeAuthToken(fn) {
   _listeners.add(fn);
   return () => _listeners.delete(fn);
+}
+
+function _decodeJwtPayload(token) {
+  if (!token || typeof token !== 'string') return null;
+  const [, payload] = token.split('.');
+  if (!payload) return null;
+  try {
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(normalized.length + ((4 - normalized.length % 4) % 4), '=');
+    const json = typeof atob === 'function'
+      ? atob(padded)
+      : globalThis.Buffer?.from(padded, 'base64').toString('utf8');
+    if (!json) return null;
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+export function getAuthTokenExpiryMs(token = getAuthToken()) {
+  const payload = _decodeJwtPayload(token);
+  return payload?.exp ? Number(payload.exp) * 1000 : null;
+}
+
+export function isAuthTokenExpiringSoon(token = getAuthToken(), windowMs = 10 * 60 * 1000) {
+  const expiresAt = getAuthTokenExpiryMs(token);
+  if (!token || !expiresAt) return false;
+  return expiresAt - Date.now() <= windowMs;
+}
+
+export function notifySessionExpired(detail = {}) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT, { detail }));
 }
