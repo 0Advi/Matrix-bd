@@ -54,6 +54,9 @@ import NsoQueuePage             from '../modules/nso/NsoQueuePage.jsx';
 import NsoReviewPage            from '../modules/nso/NsoReviewPage.jsx';
 import ProjectExcellenceQueuePage  from '../modules/project_excellence/ProjectExcellenceQueuePage.jsx';
 import ProjectExcellenceReviewPage from '../modules/project_excellence/ProjectExcellenceReviewPage.jsx';
+import NsoHandoverPage             from '../modules/project/NsoHandoverPage.jsx';
+import FinancialClosureQueuePage   from '../modules/financial_closure/FinancialClosureQueuePage.jsx';
+import FinancialClosureReviewPage  from '../modules/financial_closure/FinancialClosureReviewPage.jsx';
 
 // In HTTP (non-mock) mode the landing page is the unauthenticated entry. The
 // existing app chrome only renders after a Supabase session is established.
@@ -372,6 +375,27 @@ export default function AppRouter() {
           <RequireRole roles={['supervisor', 'executive', 'exec']}>
             <RequireModule modules={['project']}>
               <ModuleProcessFlowPage moduleKey="project"/>
+            </RequireModule>
+          </RequireRole>
+        }/>
+        <Route path={ROUTES.PROJECT_NSO_HANDOVER} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['project']}>
+              <NsoHandoverPage/>
+            </RequireModule>
+          </RequireRole>
+        }/>
+        <Route path={ROUTES.PROJECT_FINANCIAL_CLOSURE} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['project']}>
+              <FinancialClosureQueuePage/>
+            </RequireModule>
+          </RequireRole>
+        }/>
+        <Route path={ROUTES.PROJECT_FINANCIAL_CLOSURE_SITE} element={
+          <RequireRole roles={['supervisor', 'executive', 'exec']}>
+            <RequireModule modules={['project']}>
+              <FinancialClosureReviewPage/>
             </RequireModule>
           </RequireRole>
         }/>

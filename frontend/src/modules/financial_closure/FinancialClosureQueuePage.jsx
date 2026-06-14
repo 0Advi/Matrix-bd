@@ -4,33 +4,26 @@ import PageHeader, { HeaderTag } from '../shared/page-header/PageHeader.jsx';
 import Icon from '../shared/primitives/Icon.jsx';
 import SubFilterPill from '../shared/primitives/SubFilterPill.jsx';
 import { useSession } from '../../state/SessionContext.jsx';
-import { getPEQueue } from '../../services/api/projectExcellenceApi.js';
-import { projectExcellenceSiteRoute } from '../../router/routes.js';
+import { getFCQueue } from '../../services/api/financialClosureApi.js';
+import { projectFinancialClosureSiteRoute } from '../../router/routes.js';
 import { useSiteDataRefresh } from '../../hooks/useSiteDataRefresh.js';
 import { useFocusSite } from '../../hooks/useFocusSite.js';
 
 const STATUS_LABELS = {
-  pending: 'Awaiting allocation',
+  open: 'Open',
   allocated: 'Allocated',
   budgeting: 'Budgeting',
-  approved: 'Approved',
-  done: 'Done',
+  closed: 'Closed',
 };
 
 const STATUS_FILTERS = [
-  { key: 'pending',   label: 'Pending',   color: 'var(--zm-warning)' },
+  { key: 'open',      label: 'Open',      color: 'var(--zm-warning)' },
   { key: 'allocated', label: 'Allocated', color: 'var(--zm-accent)' },
   { key: 'budgeting', label: 'Budgeting', color: 'var(--zm-copper)' },
-  { key: 'approved',  label: 'Approved',  color: 'var(--zm-success)' },
+  { key: 'closed',    label: 'Closed',    color: 'var(--zm-success)' },
 ];
 
-const BUDGET_LABELS = {
-  draft: 'Draft',
-  pending_supervisor: 'Supervisor review',
-  pending_admin: 'Admin review',
-  approved: 'Approved',
-  rejected: 'Rejected',
-};
+const fmtMoney = (value) => (value == null ? '-' : Number(value).toLocaleString());
 
 function StatusPill({ value, tone = 'var(--zm-accent)' }) {
   return (
@@ -45,7 +38,7 @@ function StatusPill({ value, tone = 'var(--zm-accent)' }) {
   );
 }
 
-export default function ProjectExcellenceQueuePage() {
+export default function FinancialClosureQueuePage() {
   const navigate = useNavigate();
   const { role } = useSession();
   const [state, setState] = React.useState({ status: 'loading', items: [], total: 0, error: null });
@@ -56,7 +49,7 @@ export default function ProjectExcellenceQueuePage() {
   const load = React.useCallback(() => {
     let cancelled = false;
     setState((prev) => ({ ...prev, status: prev.items.length ? prev.status : 'loading', error: null }));
-    getPEQueue()
+    getFCQueue()
       .then((data) => {
         if (!cancelled) setState({ status: 'ready', items: data.items, total: data.total, error: null });
       })
@@ -65,7 +58,7 @@ export default function ProjectExcellenceQueuePage() {
           setState((prev) => ({
             ...prev,
             status: prev.items.length ? 'ready' : 'error',
-            error: err?.detail || err?.message || 'Failed to load project excellence queue',
+            error: err?.detail || err?.message || 'Failed to load financial closure queue',
           }));
         }
       });
@@ -73,31 +66,31 @@ export default function ProjectExcellenceQueuePage() {
   }, []);
 
   React.useEffect(() => load(), [load]);
-  useSiteDataRefresh(load, { sources: ['project_excellence', 'businessAdmin', 'project'] });
+  useSiteDataRefresh(load, { sources: ['financial_closure', 'businessAdmin', 'project'] });
 
-  const open = (row) => navigate(projectExcellenceSiteRoute(row.siteId));
-  const COLS = '120px minmax(220px, 1fr) 130px 160px 160px 120px';
+  const open = (row) => navigate(projectFinancialClosureSiteRoute(row.siteId));
+  const COLS = '120px minmax(220px, 1fr) 130px 150px 150px 150px 130px';
 
   const statusCounts = STATUS_FILTERS.reduce((acc, f) => {
-    acc[f.key] = state.items.filter((row) => row.excellenceStatus === f.key).length;
+    acc[f.key] = state.items.filter((row) => row.financialClosureStatus === f.key).length;
     return acc;
   }, {});
   const visibleItems = statusFilter === 'all'
     ? state.items
-    : state.items.filter((row) => row.excellenceStatus === statusFilter);
+    : state.items.filter((row) => row.financialClosureStatus === statusFilter);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <PageHeader
-        file="No. 10"
-        eyebrow="Project Excellence module"
-        title="Pipeline"
-        right={<HeaderTag icon="box" label="DESIGN GFC-APPROVED"/>}
+        file="No. 11"
+        eyebrow="Project module"
+        title="Financial Closure"
+        right={<HeaderTag icon="box" label="LAUNCHED"/>}
       />
 
       {state.status === 'loading' && (
         <div className="zm-glass" style={{ padding: 24, textAlign: 'center', color: 'var(--zm-fg-3)' }}>
-          Loading project excellence queue...
+          Loading financial closure queue...
         </div>
       )}
 
@@ -126,7 +119,7 @@ export default function ProjectExcellenceQueuePage() {
           <p style={{ margin: '12px 0 0' }}>
             {statusFilter !== 'all' && state.items.length > 0
               ? 'No sites match the current status filter.'
-              : 'No design-GFC-approved sites are waiting for Project Excellence right now.'}
+              : 'No launched sites are waiting for Financial Closure right now.'}
           </p>
         </div>
       )}
@@ -142,56 +135,56 @@ export default function ProjectExcellenceQueuePage() {
             <span>Code</span>
             <span>Site</span>
             <span>City</span>
-            <span>Excellence status</span>
-            <span>Budget</span>
-            <span style={{ textAlign: 'right' }}>Action</span>
+            <span>Closure status</span>
+            <span style={{ textAlign: 'right' }}>GFC total</span>
+            <span style={{ textAlign: 'right' }}>Closure total</span>
+            <span style={{ textAlign: 'right' }}>Variation</span>
           </div>
 
-          {visibleItems.map((row) => (
-            <div
-              key={row.siteId}
-              data-site-id={row.siteId}
-              className="zm-row"
-              onClick={() => open(row)}
-              style={{
-                display: 'grid', gridTemplateColumns: COLS, gap: 12,
-                padding: '14px 16px', borderBottom: '1px solid var(--zm-line-faint)',
-                cursor: 'pointer', alignItems: 'center',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--zm-surface-hover)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-            >
-              <span style={{ fontFamily: 'var(--zm-font-mono)', fontSize: 12, color: 'var(--zm-fg-2)' }}>
-                {row.siteCode}
-              </span>
-              <span style={{ fontFamily: 'var(--zm-font-body)', fontSize: 13.5, fontWeight: 800, color: 'var(--zm-fg)' }}>
-                {row.siteName}
-                {row.allocatedToName && (
-                  <span style={{ display: 'block', marginTop: 3, color: 'var(--zm-fg-3)', fontWeight: 600, fontSize: 12 }}>
-                    Allocated to {row.allocatedToName}
-                  </span>
-                )}
-              </span>
-              <span style={{ color: 'var(--zm-fg-2)' }}>{row.city}</span>
-              <StatusPill value={STATUS_LABELS[row.excellenceStatus] || row.excellenceStatus}/>
-              <StatusPill
-                value={BUDGET_LABELS[row.budgetStatus] || row.budgetStatus}
-                tone={row.budgetStatus === 'approved' ? 'var(--zm-success)' : 'var(--zm-copper)'}
-              />
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); open(row); }}
+          {visibleItems.map((row) => {
+            const variation = row.variationTotal == null ? null : Number(row.variationTotal);
+            const variationTone = variation == null || variation === 0
+              ? 'var(--zm-fg-2)'
+              : variation > 0 ? 'var(--zm-danger)' : 'var(--zm-success)';
+            return (
+              <div
+                key={row.siteId}
+                data-site-id={row.siteId}
+                className="zm-row"
+                onClick={() => open(row)}
                 style={{
-                  justifySelf: 'end', height: 32, padding: '0 14px', border: 'none',
-                  borderRadius: 7, background: 'var(--zm-accent)', color: '#fff',
-                  fontFamily: 'var(--zm-font-body)', fontSize: 12, fontWeight: 800,
-                  cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+                  display: 'grid', gridTemplateColumns: COLS, gap: 12,
+                  padding: '14px 16px', borderBottom: '1px solid var(--zm-line-faint)',
+                  cursor: 'pointer', alignItems: 'center',
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--zm-surface-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
               >
-                Open<Icon name="arrow" size={12}/>
-              </button>
-            </div>
-          ))}
+                <span style={{ fontFamily: 'var(--zm-font-mono)', fontSize: 12, color: 'var(--zm-fg-2)' }}>
+                  {row.siteCode}
+                </span>
+                <span style={{ fontFamily: 'var(--zm-font-body)', fontSize: 13.5, fontWeight: 800, color: 'var(--zm-fg)' }}>
+                  {row.siteName}
+                  {row.allocatedToName && (
+                    <span style={{ display: 'block', marginTop: 3, color: 'var(--zm-fg-3)', fontWeight: 600, fontSize: 12 }}>
+                      Allocated to {row.allocatedToName}
+                    </span>
+                  )}
+                </span>
+                <span style={{ color: 'var(--zm-fg-2)' }}>{row.city}</span>
+                <StatusPill value={STATUS_LABELS[row.closureStatus] || row.closureStatus}/>
+                <span style={{ textAlign: 'right', fontFamily: 'var(--zm-font-mono)', fontSize: 12.5, color: 'var(--zm-fg-2)' }}>
+                  {fmtMoney(row.gfcBudgetTotal)}
+                </span>
+                <span style={{ textAlign: 'right', fontFamily: 'var(--zm-font-mono)', fontSize: 12.5, color: 'var(--zm-fg-2)' }}>
+                  {fmtMoney(row.closureBudgetTotal)}
+                </span>
+                <span style={{ textAlign: 'right', fontFamily: 'var(--zm-font-mono)', fontSize: 12.5, fontWeight: 800, color: variationTone }}>
+                  {fmtMoney(row.variationTotal)}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

@@ -9,13 +9,11 @@ import {
   finalizeInitialization,
   getProject,
   respondInitialization,
-  reviewProjectBudget,
   reviewProjectMilestone,
-  reviewQualityAudit,
-  saveProjectBudget,
   setMidProjectVisit,
   submitProjectMilestone,
-  uploadQualityAuditReport,
+  submitQualityAuditInspectionDate,
+  supervisorApproveQualityAudit,
 } from '../../services/api/projectApi.js';
 import { ROUTES } from '../../router/routes.js';
 import { useSiteDataRefresh } from '../../hooks/useSiteDataRefresh.js';
@@ -251,34 +249,15 @@ export default function ProjectReviewPage() {
     totalAreaSqft: areaInputs.total_area_sqft,
     covers: areaInputs.covers,
   };
-  const budgetEditable = review ? ['draft', 'rejected'].includes(review.budgetStatus) : false;
-  const budgetLockedReason = review?.budgetStatus === 'pending_supervisor'
-    ? 'Budget is awaiting supervisor review and is read-only until it is sent back.'
-    : review?.budgetStatus === 'pending_admin'
-      ? 'Budget is awaiting business-admin review and is read-only until it is sent back.'
-      : review?.budgetStatus === 'approved'
-        ? 'Budget is approved and locked.'
-        : null;
+  // The 11-item budget now lives in Project Excellence (filled after GFC). It is
+  // READ-ONLY here — the project just displays the approved figures.
+  const budgetEditable = false;
+  const budgetLockedReason = review?.budgetStatus === 'approved'
+    ? 'Budget approved in Project Excellence — shown read-only.'
+    : 'Budget is managed in Project Excellence (post-GFC). Execution unlocks once it is approved.';
 
-  const handleBackToQueue = async () => {
-    // Only the budget has a draft; execution steps are explicit actions.
-    if (!budgetDirty || !budgetEditable) {
-      navigate(ROUTES.PROJECT);
-      return;
-    }
-    setBusy(true);
-    try {
-      const next = await saveProjectBudget(siteId, { ...budgetPayload, action: 'save' });
-      rehydrateReview(next);
-      navigate(ROUTES.PROJECT);
-    } catch (err) {
-      setState((prev) => ({
-        ...prev,
-        error: err?.detail || err?.message || 'Could not save the budget draft before returning to queue.',
-      }));
-    } finally {
-      setBusy(false);
-    }
+  const handleBackToQueue = () => {
+    navigate(ROUTES.PROJECT);
   };
 
   return (
@@ -445,17 +424,7 @@ export default function ProjectReviewPage() {
             </div>
 
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {budgetEditable && (
-                <>
-                  <ActionButton disabled={busy} variant="ghost" onClick={() => mutate(() => saveProjectBudget(siteId, { ...budgetPayload, action: 'save' }))}>
-                    Save budget draft
-                  </ActionButton>
-                  <ActionButton disabled={busy} onClick={() => mutate(() => saveProjectBudget(siteId, { ...budgetPayload, action: 'submit' }))}>
-                    Submit budget
-                  </ActionButton>
-                </>
-              )}
-              {!budgetEditable && budgetLockedReason && (
+              {budgetLockedReason && (
                 <div style={{
                   minHeight: 36,
                   padding: '9px 12px',
@@ -467,16 +436,6 @@ export default function ProjectReviewPage() {
                 }}>
                   {budgetLockedReason}
                 </div>
-              )}
-              {isSupervisor && review.budgetStatus === 'pending_supervisor' && (
-                <>
-                  <ActionButton disabled={busy} onClick={() => mutate(() => reviewProjectBudget(siteId, { decision: 'approve' }))}>
-                    Approve to admin
-                  </ActionButton>
-                  <ActionButton disabled={busy} variant="ghost" onClick={() => mutate(() => reviewProjectBudget(siteId, { decision: 'reject', comments: 'Budget needs revision.' }))}>
-                    Reject
-                  </ActionButton>
-                </>
               )}
             </div>
           </FieldCard>
@@ -636,7 +595,7 @@ function ExecutionSection({ review, siteId, isSupervisor, dark, busy, mutate }) 
   const hasExecutive = !!review.allocatedTo;
 
   return (
-    <FieldCard title="Execution" right={statusPill(done ? 'Pushed to NSO' : 'In progress', done ? 'var(--zm-success)' : 'var(--zm-accent)')}>
+    <FieldCard title="Execution" right={statusPill(done ? 'Project complete' : 'In progress', done ? 'var(--zm-success)' : 'var(--zm-accent)')}>
       {!hasExecutive && (
         <div style={{
           padding: '10px 14px',
@@ -738,20 +697,24 @@ function ExecutionSection({ review, siteId, isSupervisor, dark, busy, mutate }) 
             <span style={muted}>Unlocks after the mid-project visit date is set.</span>
           ) : qaStatus === 'approved' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ color: 'var(--zm-success)', fontWeight: 700 }}>Audit approved · project complete · pushed to NSO.</span>
-              <span style={muted}>Inspection: {fmtDate(review.inspectionDate)}</span>
-              {review.qualityAuditDownloadUrl && <a href={review.qualityAuditDownloadUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--zm-accent)', fontSize: 12.5 }}>Download report</a>}
+              <span style={{ color: 'var(--zm-success)', fontWeight: 700 }}>Audit confirmed by business-admin · project complete.</span>
+              <span style={muted}>Inspection date: {fmtDate(review.inspectionDate)}</span>
+              <span style={muted}>Open the NSO Handover tab to push this site to NSO.</span>
+            </div>
+          ) : qaStatus === 'supervisor_approved' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={muted}>Inspection date: {fmtDate(review.inspectionDate)}</span>
+              <span style={{ color: 'var(--zm-copper)', fontSize: 12.5 }}>Approved by supervisor — awaiting business-admin confirmation.</span>
             </div>
           ) : qaStatus === 'submitted' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={muted}>Inspection date: {fmtDate(review.inspectionDate)}</span>
-              {review.qualityAuditDownloadUrl && <a href={review.qualityAuditDownloadUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--zm-accent)', fontSize: 12.5 }}>Download report</a>}
               {isSupervisor ? (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <ActionButton disabled={busy} onClick={() => mutate(() => reviewQualityAudit(siteId, { decision: 'approve' }))}>Approve &amp; push to NSO</ActionButton>
+                  <ActionButton disabled={busy} onClick={() => mutate(() => supervisorApproveQualityAudit(siteId, { decision: 'approve' }))}>Approve</ActionButton>
                   <ActionButton variant="ghost" disabled={busy} onClick={() => setModal('qa-reject')}>Reject</ActionButton>
                 </div>
-              ) : <span style={muted}>Awaiting supervisor confirmation.</span>}
+              ) : <span style={muted}>Awaiting supervisor approval.</span>}
             </div>
           ) : !isSupervisor ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -759,17 +722,13 @@ function ExecutionSection({ review, siteId, isSupervisor, dark, busy, mutate }) 
                 <span style={{ color: 'var(--zm-danger)', fontSize: 12.5 }}>Returned: {review.qualityAuditComments}</span>
               )}
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ color: 'var(--zm-fg-3)', fontSize: 12 }}>Quality audit report</span>
-                <input type="file" onChange={(e) => setAuditFile(e.target.files?.[0] || null)} style={{ fontSize: 12.5, color: 'var(--zm-fg)' }} />
-              </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ color: 'var(--zm-fg-3)', fontSize: 12 }}>Inspection date</span>
                 <input type="date" value={inspectionDate} onChange={(e) => setInspectionDate(e.target.value)} style={zmDateStyle(dark)} />
               </label>
-              <ActionButton disabled={busy || !auditFile || !inspectionDate} onClick={() => mutate(() => uploadQualityAuditReport(siteId, auditFile, inspectionDate))}>Submit for approval</ActionButton>
+              <ActionButton disabled={busy || !inspectionDate} onClick={() => mutate(() => submitQualityAuditInspectionDate(siteId, inspectionDate))}>Submit for approval</ActionButton>
             </div>
           ) : hasExecutive
-              ? <span style={muted}>Awaiting the executive to upload the audit report.</span>
+              ? <span style={muted}>Awaiting the executive to set the inspection date.</span>
               : <span style={{ color: 'var(--zm-copper)', fontSize: 12.5 }}>Allocate an executive above to proceed.</span>}
         </StageCard>
       </div>
@@ -785,9 +744,9 @@ function ExecutionSection({ review, siteId, isSupervisor, dark, busy, mutate }) 
           onConfirm={(reason) => { setModal(null); mutate(() => reviewProjectMilestone(siteId, 'expected_completion_date', { decision: 'reject', comments: reason })); }} />
       )}
       {modal === 'qa-reject' && (
-        <ReasonModal title="Reject quality audit" label="This returns it to the executive to re-upload." confirmLabel="Reject" dark={dark} busy={busy}
+        <ReasonModal title="Reject quality audit" label="This returns it to the executive to re-enter the inspection date." confirmLabel="Reject" dark={dark} busy={busy}
           onClose={() => setModal(null)}
-          onConfirm={(reason) => { setModal(null); mutate(() => reviewQualityAudit(siteId, { decision: 'reject', comments: reason })); }} />
+          onConfirm={(reason) => { setModal(null); mutate(() => supervisorApproveQualityAudit(siteId, { decision: 'reject', comments: reason })); }} />
       )}
     </FieldCard>
   );

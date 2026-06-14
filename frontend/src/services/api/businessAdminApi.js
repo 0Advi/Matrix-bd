@@ -81,7 +81,7 @@ export async function rejectFinance(siteId, reason) {
 // ── Project budget approvals ─────────────────────────────────────────────────
 
 export async function getBudgetQueue() {
-  const d = await client.get('/project/budget-admin-queue').then((r) => r.data);
+  const d = await client.get('/project-excellence/budget-admin-queue').then((r) => r.data);
   return {
     items: (d.items || []).map((r) => ({
       siteId: r.site_id, siteCode: r.site_code, siteName: r.site_name, city: r.city,
@@ -96,12 +96,12 @@ export async function getBudgetQueue() {
   };
 }
 
-export async function reviewBudget(siteId, { decision, comments, initializationDate } = {}) {
+export async function reviewBudget(siteId, { decision, comments } = {}) {
+  // The 11-field budget now lives in Project Excellence (post-GFC); the admin
+  // tier-2 review targets that module.
   const body = { decision };
   if (comments) body.comments = comments;
-  // On approve, the admin also sets the project initialization date.
-  if (decision === 'approve' && initializationDate) body.initialization_date = initializationDate;
-  const result = await client.post(`/project/${siteId}/budget/admin-review`, body).then((r) => r.data);
+  const result = await client.post(`/project-excellence/${siteId}/budget/admin-review`, body).then((r) => r.data);
   notifySiteDataChanged({ source: 'businessAdmin', action: `budget_${decision}`, siteId });
   return result;
 }
@@ -109,7 +109,7 @@ export async function reviewBudget(siteId, { decision, comments, initializationD
 // Full budget breakdown for the approval drawer — Business Admin-safe detail
 // route, separate from the active Project module route.
 export async function fetchBudgetDetail(siteId) {
-  const d = await client.get(`/project/budget-admin-detail/${siteId}`).then((r) => r.data);
+  const d = await client.get(`/project-excellence/budget-admin-detail/${siteId}`).then((r) => r.data);
   return {
     siteId: d.site_id,
     siteCode: d.site_code,
@@ -126,6 +126,53 @@ export async function fetchBudgetDetail(siteId) {
     budgetAdminComments: d.budget_admin_comments,
     updatedAt: d.updated_at,
   };
+}
+
+// ── Quality-audit confirmation (business-admin, second tier) ─────────────────
+
+export async function getQualityAuditQueue() {
+  const d = await client.get('/project/quality-audit/admin-queue').then((r) => r.data);
+  return {
+    items: (d.items || []).map((r) => ({
+      siteId: r.site_id, siteCode: r.site_code, siteName: r.site_name, city: r.city,
+      inspectionDate: r.inspection_date,
+      submittedByName: r.submitted_by_name,
+    })),
+    total: d.total ?? 0,
+  };
+}
+
+export async function confirmQualityAudit(siteId, { decision, comments } = {}) {
+  const body = { decision };
+  if (comments) body.comments = comments;
+  const result = await client.post(`/project/${siteId}/quality-audit/admin-confirm`, body).then((r) => r.data);
+  notifySiteDataChanged({ source: 'businessAdmin', action: `quality_${decision}`, siteId });
+  return result;
+}
+
+// ── Financial closure (business-admin finalize) ──────────────────────────────
+
+export async function getClosureAdminQueue() {
+  const d = await client.get('/financial-closure/admin-queue').then((r) => r.data);
+  return {
+    items: (d.items || []).map((r) => ({
+      siteId: r.site_id, siteCode: r.site_code, siteName: r.site_name, city: r.city,
+      closureStatus: r.closure_status,
+      gfcBudgetTotal: num(r.gfc_budget_total),
+      closureBudgetTotal: num(r.closure_budget_total),
+      variationTotal: num(r.variation_total),
+      submittedByName: r.submitted_by_name,
+    })),
+    total: d.total ?? 0,
+  };
+}
+
+export async function finalizeClosure(siteId, { decision, comments } = {}) {
+  const body = { decision };
+  if (comments) body.comments = comments;
+  const result = await client.post(`/financial-closure/${siteId}/finalize`, body).then((r) => r.data);
+  notifySiteDataChanged({ source: 'businessAdmin', action: `closure_${decision}`, siteId });
+  return result;
 }
 
 // ── Department org tree ──────────────────────────────────────────────────────

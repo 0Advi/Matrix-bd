@@ -608,6 +608,63 @@ function BudgetBlock({ site, fetchDetail, onDecide }) {
   );
 }
 
+// ── Quality-audit confirmation (tier-2 business-admin) ───────────────────────
+function QualityAuditBlock({ site, onConfirm }) {
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+  const qa = site.qualityAudit || {};
+  const decide = async (decision) => {
+    setBusy(true); setErr(null);
+    try { await onConfirm(site.siteId, { decision }); }
+    catch (e) { setErr(e?.detail || e?.message || 'Action failed'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
+        <RequestMeta label="Inspection date" value={qa.inspectionDate || '—'} />
+        <RequestMeta label="Supervisor" value="Approved — awaiting confirmation" />
+      </div>
+      {err && <div role="alert" style={{ color: T.dangerText, fontSize: 12, margin: '6px 0' }}>{err}</div>}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+        <Button variant="success" size="md" loading={busy} icon={!busy && <Icon.check size={15} />}
+          onClick={() => decide('approve')}>Confirm audit</Button>
+        <Button variant="danger" size="md" disabled={busy} icon={<Icon.x size={15} />}
+          onClick={() => decide('reject')}>Send back</Button>
+      </div>
+    </>
+  );
+}
+
+// ── Financial closure finalize (tier-2 business-admin) ───────────────────────
+function ClosureBlock({ site, onFinalize }) {
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+  const fc = site.financialClosure || {};
+  const decide = async (decision) => {
+    setBusy(true); setErr(null);
+    try { await onFinalize(site.siteId, { decision }); }
+    catch (e) { setErr(e?.detail || e?.message || 'Action failed'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 8 }}>
+        <RequestMeta label="GFC budget" value={inr(fc.gfcBudgetTotal)} />
+        <RequestMeta label="Closure actual" value={inr(fc.closureBudgetTotal)} />
+        <RequestMeta label="Variation" value={inr(fc.variationTotal)} />
+      </div>
+      {err && <div role="alert" style={{ color: T.dangerText, fontSize: 12, margin: '6px 0' }}>{err}</div>}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+        <Button variant="success" size="md" loading={busy} icon={!busy && <Icon.check size={15} />}
+          onClick={() => decide('approve')}>Financial Closure</Button>
+        <Button variant="danger" size="md" disabled={busy} icon={<Icon.x size={15} />}
+          onClick={() => decide('reject')}>Send back</Button>
+      </div>
+    </>
+  );
+}
+
 export default function SiteApprovalPanel({ site, handlers }) {
   const { design, payment, project } = site;
   const deliverables = design?.deliverables || [];
@@ -643,6 +700,16 @@ export default function SiteApprovalPanel({ site, handlers }) {
       {project && (
         <BlockShell icon={Icon.wrench} tone="project" title="Project budget approval" amount={project.budgetTotal}>
           <BudgetBlock site={site} fetchDetail={handlers.fetchBudgetDetail} onDecide={handlers.onBudgetDecide} />
+        </BlockShell>
+      )}
+      {site.qualityAudit && (
+        <BlockShell icon={Icon.check} tone="project" title="Quality audit confirmation">
+          <QualityAuditBlock site={site} onConfirm={handlers.onQualityConfirm} />
+        </BlockShell>
+      )}
+      {site.financialClosure && (
+        <BlockShell icon={Icon.wallet} tone="payment" title="Financial closure" amount={site.financialClosure.closureBudgetTotal}>
+          <ClosureBlock site={site} onFinalize={handlers.onClosureFinalize} />
         </BlockShell>
       )}
     </div>

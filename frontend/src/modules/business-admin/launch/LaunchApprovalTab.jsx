@@ -24,6 +24,7 @@ import {
   getLaunchQueue, getLaunchApproval, saveLaunchRentFields,
   sendForReview, finalConfirm, launchSite,
 } from '../../../services/api/launchApprovalApi.js';
+import { sendForFinancialClosure } from '../../../services/api/financialClosureApi.js';
 
 // ── Status display map ─────────────────────────────────────────────────────────
 const STATUS_LABELS = {
@@ -212,6 +213,12 @@ function LaunchDetailDrawer({ siteId, onClose, onRefresh }) {
       if (action === 'send') { d = await sendForReview(siteId, comment); msg = 'Sent for review'; }
       else if (action === 'final') { d = await finalConfirm(siteId, comment); msg = 'Rent terms confirmed'; }
       else if (action === 'launch') { d = await launchSite(siteId); msg = 'Site launched successfully!'; }
+      else if (action === 'send_closure') {
+        await sendForFinancialClosure(siteId);
+        showToast('Sent for financial closure');
+        onRefresh();
+        return;
+      }
       hydrate(d);
       setComment('');
       showToast(msg);
@@ -266,6 +273,11 @@ function LaunchDetailDrawer({ siteId, onClose, onRefresh }) {
             <Button variant="success" size="md" loading={acting} onClick={() => handleAction('launch')}
               style={{ background: '#2EA86A', color: '#fff' }}>
               Launch Site
+            </Button>
+          )}
+          {status === 'launched' && (
+            <Button variant="accent" size="md" loading={acting} onClick={() => handleAction('send_closure')}>
+              Send for financial closure →
             </Button>
           )}
           {(status === 'under_exec_review' || status === 'under_supervisor_review') && (

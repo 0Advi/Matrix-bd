@@ -8,6 +8,7 @@ import {
 } from '../../services/api/designApi.js';
 import {
   getFinanceQueue, approveFinance, rejectFinance, getBudgetQueue, reviewBudget, fetchBudgetDetail,
+  getQualityAuditQueue, confirmQualityAudit, getClosureAdminQueue, finalizeClosure,
   getOrg, getAllSites, getSiteHistory,
 } from '../../services/api/businessAdminApi.js';
 import {
@@ -35,6 +36,10 @@ export const REAL_FETCHERS = {
   listBudget:        getBudgetQueue,
   reviewBudget,
   fetchBudgetDetail,
+  listQualityAudit:  getQualityAuditQueue,
+  confirmQualityAudit,
+  listClosure:       getClosureAdminQueue,
+  finalizeClosure,
   listSupervisors:   listPendingSupervisors,
   approveSupervisor,
   rejectSupervisor,
@@ -95,6 +100,8 @@ export default function TeamDashboard({ onLogout, fetchers = REAL_FETCHERS, work
   const [gfc, loadGfc] = useQueue(fetchers.listGfc);
   const [finance, loadFinance] = useQueue(fetchers.listFinance);
   const [budget, loadBudget] = useQueue(fetchers.listBudget);
+  const [qualityAudit, loadQualityAudit] = useQueue(fetchers.listQualityAudit);
+  const [closure, loadClosure] = useQueue(fetchers.listClosure);
   // Departments
   const [supervisors, loadSupervisors] = useQueue(fetchers.listSupervisors);
   const [org, loadOrg] = useQueue(fetchers.listOrg);
@@ -108,7 +115,8 @@ export default function TeamDashboard({ onLogout, fetchers = REAL_FETCHERS, work
       if (!map.has(s.siteId)) {
         map.set(s.siteId, {
           siteId: s.siteId, siteCode: s.siteCode, siteName: s.siteName, city: s.city,
-          design: { deliverables: [], gfcPending: false, boqAmount: null }, payment: null, project: null,
+          design: { deliverables: [], gfcPending: false, boqAmount: null },
+          payment: null, project: null, qualityAudit: null, financialClosure: null,
         });
       }
       return map.get(s.siteId);
@@ -129,10 +137,21 @@ export default function TeamDashboard({ onLogout, fetchers = REAL_FETCHERS, work
     covers: s.covers,
     submittedByName: s.submittedByName,
   };
+  for (const s of qualityAudit.items || []) ensure(s).qualityAudit = {
+    inspectionDate: s.inspectionDate,
+    submittedByName: s.submittedByName,
+  };
+  for (const s of closure.items || []) ensure(s).financialClosure = {
+    closureStatus: s.closureStatus,
+    gfcBudgetTotal: s.gfcBudgetTotal,
+    closureBudgetTotal: s.closureBudgetTotal,
+    variationTotal: s.variationTotal,
+    submittedByName: s.submittedByName,
+  };
     return [...map.values()];
-  }, [deliverables.items, gfc.items, finance.items, budget.items]);
+  }, [deliverables.items, gfc.items, finance.items, budget.items, qualityAudit.items, closure.items]);
 
-  const aq = [deliverables, gfc, finance, budget];
+  const aq = [deliverables, gfc, finance, budget, qualityAudit, closure];
   // Resilient: only block the whole center if EVERY queue failed. One queue
   // failing (e.g. project-budget routes not deployed yet) still shows the rest.
   const approvalStatus = aq.some((q) => q.status === 'loading') ? 'loading'
@@ -140,7 +159,7 @@ export default function TeamDashboard({ onLogout, fetchers = REAL_FETCHERS, work
   const approvalError = aq.find((q) => q.status === 'error')?.error;
   const approvalData = { status: approvalStatus, sites: approvalSites, error: approvalError };
 
-  const reloadApprovals = (silent) => Promise.all([loadDeliverables(silent), loadGfc(silent), loadFinance(silent), loadBudget(silent)]);
+  const reloadApprovals = (silent) => Promise.all([loadDeliverables(silent), loadGfc(silent), loadFinance(silent), loadBudget(silent), loadQualityAudit(silent), loadClosure(silent)]);
 
   // ── derived counts ──
   const designSites = approvalSites.filter((s) => (s.design.deliverables.length + (s.design.gfcPending ? 1 : 0)) > 0).length;
@@ -159,6 +178,8 @@ export default function TeamDashboard({ onLogout, fetchers = REAL_FETCHERS, work
     onRejectFinance: async (siteId, reason) => { await fetchers.rejectFinance(siteId, reason); await loadFinance(true); },
     fetchBudgetDetail: fetchers.fetchBudgetDetail,
     onBudgetDecide: async (siteId, payload) => { await fetchers.reviewBudget(siteId, payload); await loadBudget(true); },
+    onQualityConfirm: async (siteId, payload) => { await fetchers.confirmQualityAudit(siteId, payload); await loadQualityAudit(true); },
+    onClosureFinalize: async (siteId, payload) => { await fetchers.finalizeClosure(siteId, payload); await loadClosure(true); },
     // departments
     onApproveSupervisor: async (u) => { await fetchers.approveSupervisor(u.id, u.module); await loadSupervisors(true); await loadOrg(true); },
     onRejectSupervisor: async (u) => { await fetchers.rejectSupervisor(u.id); await loadSupervisors(true); },

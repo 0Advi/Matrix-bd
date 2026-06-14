@@ -38,6 +38,9 @@ export const ROUTES = {
   PROJECT_HISTORY_SITE:   '/project/history/:siteId',
   PROJECT_PROCESS_FLOW:   '/project/process-flow',
   PROJECT_PROCESS_FLOW_SITE: '/project/process-flow/:siteId',
+  PROJECT_NSO_HANDOVER:   '/project/nso-handover',
+  PROJECT_FINANCIAL_CLOSURE: '/project/financial-closure',
+  PROJECT_FINANCIAL_CLOSURE_SITE: '/project/financial-closure/:siteId',
   NSO:                    '/nso',
   NSO_OVERVIEW:           '/nso/overview',
   NSO_SITE:               '/nso/:siteId',
@@ -100,6 +103,10 @@ export function projectHistorySiteRoute(siteId) {
 
 export function projectProcessFlowSiteRoute(siteId) {
   return ROUTES.PROJECT_PROCESS_FLOW_SITE.replace(':siteId', siteId);
+}
+
+export function projectFinancialClosureSiteRoute(siteId) {
+  return ROUTES.PROJECT_FINANCIAL_CLOSURE_SITE.replace(':siteId', siteId);
 }
 
 export function nsoSiteRoute(siteId) {

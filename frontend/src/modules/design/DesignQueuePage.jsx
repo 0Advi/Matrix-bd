@@ -24,7 +24,6 @@ const STAGE_FILTERS = [
   { id: 'recce', label: 'Recce' },
   { id: '2d',    label: '2D Approved' },  // site is at/past 2d stage
   { id: '3d',    label: '3D Approved' },  // site is at/past 3d stage
-  { id: 'boq',   label: 'BOQ Approved' },
   { id: 'gfc',   label: 'GFC Approved' },
 ];
 

@@ -110,7 +110,9 @@ function stateFromServer(row) {
     inspectionDate: row.inspection_date,
     qualityAuditStatus: row.quality_audit_status,
     qualityAuditComments: row.quality_audit_comments,
-    qualityAuditDownloadUrl: row.quality_audit_download_url,
+    qualityAuditSupervisorApprovedAt: row.quality_audit_supervisor_approved_at,
+    qualityAuditAdminConfirmedAt: row.quality_audit_admin_confirmed_at,
+    qualityAuditAdminNotes: row.quality_audit_admin_notes,
     finalCompletionDate: row.final_completion_date,
     projectCompletedAt: row.project_completed_at,
     nsoStatus: row.nso_status,
@@ -238,25 +240,43 @@ export async function setMidProjectVisit(siteId, value) {
   return stateFromServer(data);
 }
 
-// Executive uploads the quality-audit report + inspection date (multipart).
-export async function uploadQualityAuditReport(siteId, file, inspectionDate) {
-  const form = new FormData();
-  form.append('file', file);
-  if (inspectionDate) form.append('inspection_date', inspectionDate);
-  const data = await client.post(`/project/${siteId}/quality-audit/upload`, form, {
-    timeout: UPLOAD_TIMEOUT_MS,
-  }).then((r) => r.data);
-  notifySiteDataChanged({ source: 'project', action: 'quality_upload', siteId });
+// Executive records the quality-audit inspection DATE (calendar, no document).
+export async function submitQualityAuditInspectionDate(siteId, value) {
+  const data = await client.post(`/project/${siteId}/quality-audit/inspection-date`, { value }).then((r) => r.data);
+  notifySiteDataChanged({ source: 'project', action: 'quality_inspection_date', siteId });
   return stateFromServer(data);
 }
 
-export async function reviewQualityAudit(siteId, { decision, comments }) {
-  const data = await client.post(`/project/${siteId}/quality-audit/review`, { decision, comments: comments || null }).then((r) => r.data);
-  notifySiteDataChanged({ source: 'project', action: 'quality_review', siteId });
+// First tier: project supervisor approves the inspection date.
+export async function supervisorApproveQualityAudit(siteId, { decision, comments }) {
+  const data = await client.post(`/project/${siteId}/quality-audit/supervisor-approve`, { decision, comments: comments || null }).then((r) => r.data);
+  notifySiteDataChanged({ source: 'project', action: 'quality_supervisor_review', siteId });
+  return stateFromServer(data);
+}
+
+// Second tier: business_admin confirms → project completes.
+export async function adminConfirmQualityAudit(siteId, { decision, comments, adminNotes }) {
+  const data = await client.post(`/project/${siteId}/quality-audit/admin-confirm`, {
+    decision, comments: comments || null, admin_notes: adminNotes || null,
+  }).then((r) => r.data);
+  notifySiteDataChanged({ source: 'project', action: 'quality_admin_confirm', siteId });
   return stateFromServer(data);
 }
 
 export async function getNsoQueue() {
   const data = await client.get('/project/nso-queue').then((r) => r.data);
   return { items: (data.items || []).map(queueItemFromServer), total: data.total ?? 0 };
+}
+
+// NSO Handover tab — project-completed sites awaiting the supervisor's push to NSO.
+export async function getNsoHandoverQueue() {
+  const data = await client.get('/project/nso-handover').then((r) => r.data);
+  return { items: (data.items || []).map(queueItemFromServer), total: data.total ?? 0 };
+}
+
+// Supervisor pushes a project-completed site into NSO (opens the record at stage three).
+export async function pushToNso(siteId) {
+  const data = await client.post(`/project/${siteId}/push-to-nso`, {}).then((r) => r.data);
+  notifySiteDataChanged({ source: 'project', action: 'push_to_nso', siteId });
+  return stateFromServer(data);
 }

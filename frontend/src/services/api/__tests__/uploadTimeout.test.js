@@ -32,10 +32,5 @@ describe('upload timeouts (#127)', () => {
     expect(cfg.timeout).toBe(120000);
   });
 
-  it('quality-audit upload posts with a 120s timeout', async () => {
-    const { uploadQualityAuditReport } = await import('../projectApi.js');
-    await uploadQualityAuditReport('site1', new File(['x'], 'qa.pdf'), '2026-06-02');
-    const cfg = postMock.mock.calls.at(-1)[2];
-    expect(cfg.timeout).toBe(120000);
-  });
+  // (quality-audit upload removed — it is now a calendar date, no file upload.)
 });

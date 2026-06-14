@@ -12,13 +12,21 @@ const TYPE_FILTERS = [
   { key: 'design',  label: 'Design',  icon: Icon.layers },
   { key: 'payment', label: 'Payment', icon: Icon.wallet },
   { key: 'project', label: 'Budget',  icon: Icon.wrench },
+  { key: 'quality', label: 'Quality', icon: Icon.check },
+  { key: 'closure', label: 'Closure', icon: Icon.wallet },
 ];
 
 const designCount = (s) => (s.design?.deliverables?.length || 0) + (s.design?.gfcPending ? 1 : 0);
-const hasType = (s, t) => (t === 'design' ? designCount(s) > 0 : t === 'payment' ? !!s.payment : t === 'project' ? !!s.project : true);
+const hasType = (s, t) => (
+  t === 'design' ? designCount(s) > 0
+  : t === 'payment' ? !!s.payment
+  : t === 'project' ? !!s.project
+  : t === 'quality' ? !!s.qualityAudit
+  : t === 'closure' ? !!s.financialClosure
+  : true);
 
 function Chip({ icon: CIcon, label, tone }) {
-  const tones = { design: [T.accentSoft, T.accentText], payment: [T.warnSoft, T.warnText], project: [T.projectSoft, T.projectText] };
+  const tones = { design: [T.accentSoft, T.accentText], payment: [T.warnSoft, T.warnText], project: [T.projectSoft, T.projectText], quality: [T.projectSoft, T.projectText], closure: [T.warnSoft, T.warnText] };
   const [bg, fg] = tones[tone] || [T.chip, T.textMuted];
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 9px', borderRadius: 999,
@@ -38,6 +46,8 @@ export default function ApprovalCenter({ data, handlers, onRetry }) {
     design: sites.filter((s) => hasType(s, 'design')).length,
     payment: sites.filter((s) => hasType(s, 'payment')).length,
     project: sites.filter((s) => hasType(s, 'project')).length,
+    quality: sites.filter((s) => hasType(s, 'quality')).length,
+    closure: sites.filter((s) => hasType(s, 'closure')).length,
   }), [sites]);
 
   const visible = filter === 'all' ? sites : sites.filter((s) => hasType(s, filter));
@@ -90,7 +100,7 @@ export default function ApprovalCenter({ data, handlers, onRetry }) {
         <div className="ac-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {visible.map((s) => {
             const dCount = designCount(s);
-            const total = dCount + (s.payment ? 1 : 0) + (s.project ? 1 : 0);
+            const total = dCount + (s.payment ? 1 : 0) + (s.project ? 1 : 0) + (s.qualityAudit ? 1 : 0) + (s.financialClosure ? 1 : 0);
             return (
               <Card key={s.siteId} interactive raised onClick={() => setOpenId(s.siteId)}
                 style={{ padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
@@ -105,6 +115,8 @@ export default function ApprovalCenter({ data, handlers, onRetry }) {
                   {dCount > 0 && <Chip icon={Icon.layers} label={`Design · ${dCount}`} tone="design" />}
                   {s.payment && <Chip icon={Icon.wallet} label="Payment" tone="payment" />}
                   {s.project && <Chip icon={Icon.wrench} label="Budget" tone="project" />}
+                  {s.qualityAudit && <Chip icon={Icon.check} label="Quality" tone="quality" />}
+                  {s.financialClosure && <Chip icon={Icon.wallet} label="Closure" tone="closure" />}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 11.5, color: T.textFaint, ...TABULAR }}>{total} pending</span>

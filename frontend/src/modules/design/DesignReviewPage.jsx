@@ -12,10 +12,10 @@ import {
 import { useSiteDataRefresh } from '../../hooks/useSiteDataRefresh.js';
 import { usePageContext } from '../../App.jsx';
 
-// Stage order: recce → 2d → 3d → GFC gate → boq
-// GFC is rendered as a card between 3D and BOQ, so we split into two groups.
+// Stage order: recce → 2d → 3d → GFC gate. GFC approval COMPLETES the design;
+// the 11-item budget now lives in Project Excellence (no BOQ step here).
 const KINDS_BEFORE_GFC = ['recce', '2d', '3d'];
-const KINDS_AFTER_GFC  = ['boq'];
+const KINDS_AFTER_GFC  = [];
 const KIND_LABEL = { recce: 'Recce', '2d': '2D design', '3d': '3D design', boq: 'BOQ + estimate' };
 const KIND_NUM = { recce: '01', '2d': '02', '3d': '03', boq: '05' };
 
@@ -508,7 +508,7 @@ export default function DesignReviewPage() {
           {r.designStatus === 'gfc_pending'
             ? '3D design approved — the business admin gives Good-For-Construction sign-off from the Business Admin portal.'
             : r.gfcStatus === 'approved'
-              ? 'GFC approved — proceed to BOQ + estimate upload.'
+              ? 'GFC approved — design complete. The Project Excellence budget is now open for this site.'
               : r.gfcStatus === 'rejected'
                 ? '3D design was sent back for revision after GFC rejection.'
                 : 'Becomes active once 3D design is approved.'}

@@ -123,6 +123,8 @@ export default function Sidebar({ counts, role, onRole, collapsed = false }) {
     path.startsWith('/project/process-flow')             ? 'project-process-flow' :
     path.startsWith('/project/history')                  ? 'project-history' :
     path.startsWith('/project/sites')                    ? 'project-sites' :
+    path.startsWith('/project/nso-handover')             ? 'project-nso-handover' :
+    path.startsWith('/project/financial-closure')        ? 'project-financial-closure' :
     path.startsWith('/project')                          ? 'project-home' :
     path.startsWith('/nso/process-flow')                 ? 'nso-process-flow' :
     path.startsWith('/nso/history')                      ? 'nso-history' :
@@ -261,6 +263,20 @@ export default function Sidebar({ counts, role, onRole, collapsed = false }) {
             label="Sites"
             active={activeView === 'project-sites'}
             onClick={() => go(ROUTES.PROJECT_SITES)}
+            collapsed={collapsed}
+          />
+          <SidebarItem
+            icon="route"
+            label="NSO Handover"
+            active={activeView === 'project-nso-handover'}
+            onClick={() => go(ROUTES.PROJECT_NSO_HANDOVER)}
+            collapsed={collapsed}
+          />
+          <SidebarItem
+            icon="wallet"
+            label="Financial Closure"
+            active={activeView === 'project-financial-closure'}
+            onClick={() => go(ROUTES.PROJECT_FINANCIAL_CLOSURE)}
             collapsed={collapsed}
           />
           <SidebarItem
