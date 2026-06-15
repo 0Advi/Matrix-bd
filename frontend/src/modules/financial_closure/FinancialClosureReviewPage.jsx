@@ -119,6 +119,7 @@ export default function FinancialClosureReviewPage() {
 
   const [lines, setLines] = React.useState(() => linesFromState(null));
   const [execList, setExecList] = React.useState([]);
+  const [teamError, setTeamError] = React.useState(null);
   const [allocExec, setAllocExec] = React.useState('');
   const [allocNotes, setAllocNotes] = React.useState('');
   const [reviewComments, setReviewComments] = React.useState('');
@@ -127,21 +128,30 @@ export default function FinancialClosureReviewPage() {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setTeamError(null);
     Promise.all([
       getFC(siteId),
       // Financial Closure runs inside the Project module (its routes require
       // module='project'), so the allocatable people are the supervisor's
       // PROJECT team. 'financial_closure' is not a membership module — asking
       // for it 404/422s and the list comes back empty.
+      // Wrap (don't swallow): a failed team fetch must surface as a visible
+      // warning, not a silently-empty allocation list that looks healthy.
       isSupervisor
-        ? listMyTeam('project').catch(() => [])
-        : Promise.resolve([]),
-    ]).then(([data, team]) => {
+        ? listMyTeam('project').then((t) => ({ ok: true, team: t })).catch((e) => ({ ok: false, error: e }))
+        : Promise.resolve({ ok: true, team: [] }),
+    ]).then(([data, teamRes]) => {
       if (cancelled) return;
       setState(data);
       setLines(linesFromState(data));
       if (isSupervisor) {
-        setExecList(Array.isArray(team) ? team : (team?.users || []));
+        if (teamRes.ok) {
+          const team = teamRes.team;
+          setExecList(Array.isArray(team) ? team : (team?.users || []));
+        } else {
+          setExecList([]);
+          setTeamError(teamRes.error?.detail || teamRes.error?.message || 'Could not load executives to allocate. Try refreshing.');
+        }
       }
     }).catch((err) => {
       if (!cancelled) setError(err?.detail || err?.message || 'Failed to load site');
@@ -342,6 +352,11 @@ export default function FinancialClosureReviewPage() {
       {/* Allocation (supervisor only, unallocated sites) */}
       {isSupervisor && !state?.allocatedTo && !isClosed && (
         <SectionCard title="Allocate closure to executive">
+          {teamError && (
+            <div role="alert" style={{ marginBottom: 10, color: 'var(--zm-danger)', fontFamily: 'var(--zm-font-body)', fontSize: 12.5 }}>
+              {teamError}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <select
               value={allocExec}
