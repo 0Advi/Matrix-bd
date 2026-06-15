@@ -129,7 +129,7 @@ async def seed_items_from(
     Used when the Financial Closure phase opens: the same 11 labels appear, but
     amounts start empty so the user re-enters actuals and variation is computed.
     """
-    if await budget_items(session, budget_id=budget.id):
+    if await budget_items(session, budget_id=budget.id, tenant_id=budget.tenant_id):
         return
     by_idx = {i.idx: i for i in source_items}
     for idx in range(1, len(BUDGET_LABELS) + 1):

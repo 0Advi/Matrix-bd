@@ -108,3 +108,25 @@ def test_pe_admin_approval_wires_initialization_handover():
 def test_admin_budget_review_schema_carries_init_date():
     from app.domain.schemas.project_excellence import AdminBudgetReviewRequest
     assert "initialization_date" in AdminBudgetReviewRequest.model_fields
+
+
+# ── Financial-closure "send" regression ──────────────────────────────────────
+# seed_items_from called budget_items() without the now-required tenant_id kwarg,
+# 500-ing the financial-closure send button. Lock the call so it can't regress.
+
+async def test_seed_items_from_seeds_eleven_rows_with_tenant(make_session, fake_result):
+    closure = models.SiteBudget(
+        tenant_id=_Site.tenant_id, site_id=_Site.id, phase="closure", status="draft",
+    )
+    # The existing-items check (budget_items → .scalars().all()) returns empty,
+    # so the 11 closure rows get seeded. This must not raise TypeError.
+    sess = make_session(fake_result(scalars_list=[]))
+    await budget_service.seed_items_from(sess, budget=closure, source_items=[])
+    seeded = [o for o in sess.added if isinstance(o, models.SiteBudgetItem)]
+    assert len(seeded) == len(budget_service.BUDGET_LABELS)
+    assert all(o.tenant_id == _Site.tenant_id for o in seeded)
+
+
+def test_seed_items_from_passes_tenant_id_to_budget_items():
+    src = inspect.getsource(budget_service.seed_items_from)
+    assert "tenant_id=" in src   # budget_items must be called tenant-scoped
