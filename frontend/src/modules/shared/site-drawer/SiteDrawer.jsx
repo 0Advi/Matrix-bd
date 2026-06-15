@@ -256,13 +256,15 @@ function SiteOverviewTab({ site }) {
             <Field label="Google pin" value={display(site.pin)} mono/>
           </div>
           <div style={{
-            background: 'linear-gradient(135deg,var(--zm-surface-2),var(--zm-line))', borderRadius: 8, position: 'relative', overflow: 'hidden',
-            backgroundImage: "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><path d='M32 0 L0 0 0 32' fill='none' stroke='%23005F60' stroke-width='0.6' opacity='0.18'/></svg>\")",
+            borderRadius: 8, position: 'relative', overflow: 'hidden',
+            // SVG grid layered over the gradient in one backgroundImage so both
+            // render (a separate `background` shorthand would be overridden here).
+            backgroundImage: "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><path d='M32 0 L0 0 0 32' fill='none' stroke='%23496580' stroke-width='0.6' opacity='0.18'/></svg>\"), linear-gradient(135deg, var(--zm-surface-2), var(--zm-line))",
             backgroundColor: 'var(--zm-surface-2)', minHeight: 130,
           }}>
             {mapHref ? (
               <>
-                <span style={{ position: 'absolute', top: 12, left: 12, fontFamily: 'var(--zm-font-mono)', fontSize: 10, color: '#005F60' }}>map pin captured</span>
+                <span style={{ position: 'absolute', top: 12, left: 12, fontFamily: 'var(--zm-font-mono)', fontSize: 10, color: 'var(--zm-accent)' }}>map pin captured</span>
                 <span style={{
                   position: 'absolute', left: '52%', top: '46%',
                   width: 14, height: 14, borderRadius: 999, background: 'var(--zm-warning)',

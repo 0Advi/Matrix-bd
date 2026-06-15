@@ -79,8 +79,10 @@ const STAGE_COPY = {
   },
   queued: {
     label: 'QUEUED',
-    border: 'rgba(203, 213, 225, 0.90)',
-    background: 'rgba(255, 255, 255, 0.50)',
+    // Theme-aware so the queued node stays legible in dark mode (a hardcoded
+    // white fill read as a low-contrast mid-grey panel there).
+    border: 'var(--zm-line)',
+    background: 'var(--zm-surface-2)',
     color: 'var(--zm-fg-3)',
   },
 };
